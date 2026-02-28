@@ -1,0 +1,7 @@
+{
+  "name": "GymBro Final",
+  "description": "La tua app definitiva per il fitness. Traccia allenamenti, monitora i progressi e raggiungi i tuoi obiettivi.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
