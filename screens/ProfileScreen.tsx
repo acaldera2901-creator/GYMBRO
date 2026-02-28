@@ -38,9 +38,10 @@ const EditProfileModal: React.FC<{
     const [weight, setWeight] = useState(String(userProfile.weight || ''));
     const [image, setImage] = useState<string | undefined>(userProfile.image);
     const [favorites, setFavorites] = useState<string[]>(userProfile.favoriteExercises || []);
-    const [bench, setBench] = useState(String(userStats.maxes?.bench || 0));
-    const [squat, setSquat] = useState(String(userStats.maxes?.squat || 0));
-    const [deadlift, setDeadlift] = useState(String(userStats.maxes?.deadlift || 0));
+    // null = mai inserito → mostra "Aggiungi massimale"
+    const [bench, setBench] = useState<string | null>(userStats.maxes?.bench ? String(userStats.maxes.bench) : null);
+    const [squat, setSquat] = useState<string | null>(userStats.maxes?.squat ? String(userStats.maxes.squat) : null);
+    const [deadlift, setDeadlift] = useState<string | null>(userStats.maxes?.deadlift ? String(userStats.maxes.deadlift) : null);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,7 +54,7 @@ const EditProfileModal: React.FC<{
     const toggleFavorite = (id: string) =>
         setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-    const adjustValue = (setter: React.Dispatch<React.SetStateAction<string>>, current: string, delta: number) => {
+    const adjustValue = (setter: React.Dispatch<React.SetStateAction<string | null>>, current: string | null, delta: number) => {
         const val = Math.max(0, parseFloat(current || '0') + delta);
         setter(String(val % 1 === 0 ? val : val.toFixed(1)));
     };
@@ -83,9 +84,9 @@ const EditProfileModal: React.FC<{
             const statsUpdates: Partial<UserStats> = {
                 weight: weightNum,
                 maxes: {
-                    bench: parseFloat(bench) || 0,
-                    squat: parseFloat(squat) || 0,
-                    deadlift: parseFloat(deadlift) || 0,
+                    bench: bench !== null ? (parseFloat(bench) || 0) : (userStats.maxes?.bench || 0),
+                    squat: squat !== null ? (parseFloat(squat) || 0) : (userStats.maxes?.squat || 0),
+                    deadlift: deadlift !== null ? (parseFloat(deadlift) || 0) : (userStats.maxes?.deadlift || 0),
                 }
             };
             await onSave(profileUpdates, statsUpdates);
@@ -180,29 +181,41 @@ const EditProfileModal: React.FC<{
 
                     {/* --- MASSIMALI --- */}
                     <div>
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-3">Nuovi Massimali</label>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-3">Massimali</label>
                         <div className="space-y-3">
-                            {[
+                            {([
                                 { label: 'Panca', emoji: '🏋️', value: bench, setter: setBench },
                                 { label: 'Squat', emoji: '🦵', value: squat, setter: setSquat },
                                 { label: 'Stacco', emoji: '⚡', value: deadlift, setter: setDeadlift },
-                            ].map(({ label, emoji, value, setter }) => (
+                            ] as { label: string; emoji: string; value: string | null; setter: React.Dispatch<React.SetStateAction<string | null>> }[]).map(({ label, emoji, value, setter }) => (
                                 <div key={label} className="bg-zinc-900 rounded-2xl border border-zinc-800 flex items-center px-4 py-3 gap-4">
                                     <span className="text-xl">{emoji}</span>
                                     <span className="text-white font-bold text-sm flex-1">{label}</span>
-                                    <div className="flex items-center gap-3">
-                                        <button onClick={() => adjustValue(setter, value, -2.5)} className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 hover:bg-zinc-700 active:scale-95 transition-all font-bold text-lg">−</button>
-                                        <div className="flex items-baseline gap-1 w-16 justify-center">
-                                            <input
-                                                type="number"
-                                                value={value}
-                                                onChange={e => setter(e.target.value)}
-                                                className="bg-transparent text-white font-black text-lg text-center w-12 focus:outline-none"
-                                            />
-                                            <span className="text-zinc-600 text-xs">kg</span>
+                                    {value === null ? (
+                                        // Non ancora inserito → pulsante "Aggiungi"
+                                        <button
+                                            onClick={() => setter('60')}
+                                            className="text-xs font-bold text-zinc-500 border border-zinc-700 rounded-xl px-3 py-1.5 hover:border-zinc-500 hover:text-zinc-300 transition-colors active:scale-95"
+                                        >
+                                            + Aggiungi
+                                        </button>
+                                    ) : (
+                                        // Inserito → controlli +/-
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => adjustValue(setter, value, -2.5)} className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 hover:bg-zinc-700 active:scale-95 transition-all font-bold text-lg">−</button>
+                                            <div className="flex items-baseline gap-1 w-16 justify-center">
+                                                <input
+                                                    type="number"
+                                                    value={value}
+                                                    onChange={e => setter(e.target.value)}
+                                                    className="bg-transparent text-white font-black text-lg text-center w-12 focus:outline-none"
+                                                />
+                                                <span className="text-zinc-600 text-xs">kg</span>
+                                            </div>
+                                            <button onClick={() => adjustValue(setter, value, 2.5)} className={`w-8 h-8 rounded-full ${accentBg} flex items-center justify-center text-white active:scale-95 transition-all font-bold text-lg`}>+</button>
+                                            <button onClick={() => setter(null)} className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition-all ml-1">×</button>
                                         </div>
-                                        <button onClick={() => adjustValue(setter, value, 2.5)} className={`w-8 h-8 rounded-full ${accentBg} flex items-center justify-center text-white active:scale-95 transition-all font-bold text-lg`}>+</button>
-                                    </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
