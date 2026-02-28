@@ -459,11 +459,29 @@ const App: React.FC = () => {
       case 'strength-test': return <StrengthTestScreen onNext={(d) => {
           const safeWeight = parseFloat(d.testWeight.toString());
           const safeReps = parseFloat(d.testReps.toString());
-          setupProfileRef.current = { ...setupProfileRef.current, testExercise: d.testExercise, testWeight: safeWeight, testReps: safeReps };
+          // Salva anche i massimali diretti noti (knownMaxes) per PlanGenerationScreen
+          setupProfileRef.current = {
+              ...setupProfileRef.current,
+              testExercise: d.testExercise,
+              testWeight: safeWeight,
+              testReps: safeReps,
+              knownMaxes: d.knownMaxes || null
+          };
           setUserProfile(p=>({...p, testExercise: d.testExercise, testWeight: safeWeight, testReps: safeReps}));
+          // Pre-salva i maxes già noti nello stato stats
+          if (d.knownMaxes) {
+              setUserStats(p => ({
+                  ...p,
+                  maxes: {
+                      bench:    d.knownMaxes.bench    ?? p.maxes?.bench    ?? 0,
+                      squat:    d.knownMaxes.squat    ?? p.maxes?.squat    ?? 0,
+                      deadlift: d.knownMaxes.deadlift ?? p.maxes?.deadlift ?? 0,
+                  }
+              }));
+          }
           setCurrentScreen('plan-generation');
       }} />;
-      case 'plan-generation': return <PlanGenerationScreen userProfile={userProfile} onPlanGenerated={(w, calculatedMaxes) => {
+      case 'plan-generation': return <PlanGenerationScreen userProfile={{...userProfile, knownMaxes: (setupProfileRef.current as any)?.knownMaxes || null}} onPlanGenerated={(w, calculatedMaxes) => {
           setupProfileRef.current = { ...setupProfileRef.current, currentPlan: w, maxes: calculatedMaxes };
           setGeneratedWorkouts(w);
           setUserProfile(p=>({...p, currentPlan: w}));
