@@ -60,6 +60,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ onNext, userId, a
               favoriteExercises: selected,
               trainingDays: trainingDays,
               image: image || accumulatedProfile?.image,
+              maxes: accumulatedProfile?.maxes,
               setup_completed: true
           };
 

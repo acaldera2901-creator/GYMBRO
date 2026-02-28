@@ -5,7 +5,7 @@ import { BrainCircuit, CheckCircle2, Calculator } from 'lucide-react';
 
 interface PlanGenerationScreenProps {
   userProfile: UserProfile;
-  onPlanGenerated: (workouts: WorkoutCard[]) => void;
+  onPlanGenerated: (workouts: WorkoutCard[], calculatedMaxes: { bench: number; squat: number; deadlift: number }) => void;
 }
 
 // --- DATABASE TEMPLATE (20 Schede - Struttura Base) ---
@@ -317,39 +317,52 @@ const PlanGenerationScreen: React.FC<PlanGenerationScreenProps> = ({ userProfile
         setProgress(25);
         setStatus('Derivazione profilo di forza completo...');
 
-        // STEP 2: Stima dei Massimali Mancanti (Bench, Squat, Deadlift)
-        let estimatedStats = {
-            bench: 0,
-            squat: 0,
-            deadlift: 0
-        };
+        // STEP 2: Stima Massimali con ratio realistici basati su dati powerlifting
+        // Fonte: medie atleti natural intermedi (IPF statistics + ExRx.net)
+        // Ratio medio tra Big 3: Bench 1.0 | Squat 1.35 | Deadlift 1.6
+        // (variano per genere: donne hanno squat/deadlift proporzionalmente più forti)
+        
+        const isWoman = (userProfile.gender === 'Donna');
+        
+        // Coefficienti genere-specifici basati su statistiche reali
+        // Uomo:   Squat ≈ 135% Bench | Deadlift ≈ 160% Bench
+        // Donna:  Squat ≈ 145% Bench | Deadlift ≈ 165% Bench (gambe proporzionalmente più forti)
+        const RATIO_SQUAT_FROM_BENCH   = isWoman ? 1.45 : 1.35;
+        const RATIO_DEADLIFT_FROM_BENCH = isWoman ? 1.65 : 1.60;
+        const RATIO_BENCH_FROM_SQUAT   = isWoman ? (1 / 1.45) : (1 / 1.35);
+        const RATIO_DEADLIFT_FROM_SQUAT = isWoman ? (1.65 / 1.45) : (1.60 / 1.35);
+        const RATIO_BENCH_FROM_DEADLIFT = isWoman ? (1 / 1.65) : (1 / 1.60);
+        const RATIO_SQUAT_FROM_DEADLIFT = isWoman ? (1.45 / 1.65) : (1.35 / 1.60);
 
+        let estimatedStats = { bench: 0, squat: 0, deadlift: 0 };
         const testExLower = userProfile.testExercise.toLowerCase();
         let currentBase = 'Panca Piana';
 
-        // Stime approssimative basate su rapporti di forza standard
         if (testExLower.includes('panca') || testExLower.includes('bench')) {
             currentBase = 'Panca Piana';
-            estimatedStats.bench = direct1RM;
-            estimatedStats.squat = direct1RM * 1.5;
-            estimatedStats.deadlift = direct1RM * 1.75;
+            estimatedStats.bench    = direct1RM;
+            estimatedStats.squat    = direct1RM * RATIO_SQUAT_FROM_BENCH;
+            estimatedStats.deadlift = direct1RM * RATIO_DEADLIFT_FROM_BENCH;
         } else if (testExLower.includes('squat')) {
             currentBase = 'Squat';
-            estimatedStats.squat = direct1RM;
-            estimatedStats.bench = direct1RM * 0.66;
-            estimatedStats.deadlift = direct1RM * 1.2;
+            estimatedStats.squat    = direct1RM;
+            estimatedStats.bench    = direct1RM * RATIO_BENCH_FROM_SQUAT;
+            estimatedStats.deadlift = direct1RM * RATIO_DEADLIFT_FROM_SQUAT;
         } else if (testExLower.includes('stacco') || testExLower.includes('deadlift')) {
             currentBase = 'Stacco';
             estimatedStats.deadlift = direct1RM;
-            estimatedStats.squat = direct1RM * 0.85;
-            estimatedStats.bench = direct1RM * 0.57;
+            estimatedStats.squat    = direct1RM * RATIO_SQUAT_FROM_DEADLIFT;
+            estimatedStats.bench    = direct1RM * RATIO_BENCH_FROM_DEADLIFT;
         } else {
-            // Fallback generico se l'esercizio test non è standard
-            estimatedStats.bench = direct1RM;
-            estimatedStats.squat = direct1RM * 1.5;
-            estimatedStats.deadlift = direct1RM * 1.75;
+            currentBase = 'Panca Piana';
+            estimatedStats.bench    = direct1RM;
+            estimatedStats.squat    = direct1RM * RATIO_SQUAT_FROM_BENCH;
+            estimatedStats.deadlift = direct1RM * RATIO_DEADLIFT_FROM_BENCH;
         }
         setBaseUsed(currentBase);
+        
+        // Aggiorna il log con i valori calcolati
+        setStatus(`1RM ${currentBase}: ${Math.round(direct1RM)}kg → Bench: ${Math.round(estimatedStats.bench)}kg | Squat: ${Math.round(estimatedStats.squat)}kg | Dead: ${Math.round(estimatedStats.deadlift)}kg`);
 
         setProgress(40);
         setStatus('Generazione libreria completa...');
@@ -470,7 +483,13 @@ const PlanGenerationScreen: React.FC<PlanGenerationScreenProps> = ({ userProfile
         setStatus('Libreria Pronta e Ottimizzata!');
         await new Promise(r => setTimeout(r, 500));
         
-        onPlanGenerated(allGeneratedWorkouts);
+        // Arrotonda i massimali ai 2.5kg più vicini prima di salvarli
+        const roundedMaxes = {
+            bench: Math.round(estimatedStats.bench / 2.5) * 2.5,
+            squat: Math.round(estimatedStats.squat / 2.5) * 2.5,
+            deadlift: Math.round(estimatedStats.deadlift / 2.5) * 2.5,
+        };
+        onPlanGenerated(allGeneratedWorkouts, roundedMaxes);
 
       } catch (error) {
         console.error("Algo Error", error);
@@ -524,10 +543,11 @@ const PlanGenerationScreen: React.FC<PlanGenerationScreenProps> = ({ userProfile
                 </div>
                 <div className="space-y-1 font-mono text-[10px] text-slate-500">
                     <p>Base Calcolo: <span className="text-white font-bold">{baseUsed || userProfile.testExercise}</span></p>
-                    <p>1RM Diretto = {userProfile.testWeight}kg / (1.0278 - 0.0278 × {userProfile.testReps})</p>
+                    <p>1RM({userProfile.testExercise}) = {userProfile.testWeight}kg / (1.0278 - 0.0278×{userProfile.testReps})</p>
                     <p className="text-emerald-400 mt-1">
-                        Ottimizzazione per {userProfile.gender}. Preferenze applicate: {userProfile.favoriteExercises?.length || 0}.
+                        Ratio genere: {userProfile.gender === 'Donna' ? 'Donna (squat×1.45, dead×1.65)' : 'Uomo (squat×1.35, dead×1.60)'}
                     </p>
+                    <p className="text-slate-500">Preferenze applicate: {userProfile.favoriteExercises?.length || 0}</p>
                 </div>
             </div>
         </div>

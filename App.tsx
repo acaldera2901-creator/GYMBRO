@@ -463,10 +463,14 @@ const App: React.FC = () => {
           setUserProfile(p=>({...p, testExercise: d.testExercise, testWeight: safeWeight, testReps: safeReps}));
           setCurrentScreen('plan-generation');
       }} />;
-      case 'plan-generation': return <PlanGenerationScreen userProfile={userProfile} onPlanGenerated={(w) => {
-          setupProfileRef.current = { ...setupProfileRef.current, currentPlan: w };
+      case 'plan-generation': return <PlanGenerationScreen userProfile={userProfile} onPlanGenerated={(w, calculatedMaxes) => {
+          setupProfileRef.current = { ...setupProfileRef.current, currentPlan: w, maxes: calculatedMaxes };
           setGeneratedWorkouts(w);
           setUserProfile(p=>({...p, currentPlan: w}));
+          // Salva i massimali calcolati subito nello stato
+          if (calculatedMaxes) {
+              setUserStats(p => ({ ...p, maxes: calculatedMaxes }));
+          }
           setCurrentScreen('preferences');
       }} />;
       case 'preferences': return <PreferencesScreen

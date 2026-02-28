@@ -66,7 +66,8 @@ export const saveFullProfile = async (userId: string, profile: any) => {
         name: profile.name, gender: profile.gender, weight: profile.weight, height: profile.height,
         goal: profile.goal, test_exercise: profile.testExercise, test_weight: profile.testWeight, test_reps: profile.testReps,
         image: profile.image, training_days: profile.trainingDays, favorite_exercises: profile.favoriteExercises,
-        current_plan: profile.currentPlan, setup_completed: true, updated_at: new Date().toISOString()
+        current_plan: profile.currentPlan, maxes: profile.maxes,
+        setup_completed: true, updated_at: new Date().toISOString()
     }).eq('id', userId);
     if (error) throw new Error(`Profile save failed: ${error.message}`);
 };
