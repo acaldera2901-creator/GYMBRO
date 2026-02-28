@@ -15,7 +15,7 @@ import BottomNav from './components/BottomNav';
 import CoachMarks, { Step } from './components/CoachMarks';
 import BiometricGate from './components/BiometricGate';
 import { ScreenName, UserProfile, WorkoutCard, UserStats, Post, Badge, Challenge, AppNotification, Story, LeaderboardEntry, Comment, ChallengeStatus } from './types';
-import { supabase, fetchUserData, completeWorkoutTransaction, revertWorkoutTransaction, updateGuestProfile } from './lib/supabase';
+import { supabase, fetchUserData, completeWorkoutTransaction, revertWorkoutTransaction, updateGuestProfile, saveFullProfile, fetchCommunityPosts, createPost, toggleLikePost } from './lib/supabase';
 import { Loader2, Medal } from 'lucide-react';
 import { generateSmartChallenge, evaluateBadges, recalculateStreak } from './lib/gamification';
 import { SecureStorageManager } from './lib/secureStorage';
@@ -83,29 +83,39 @@ const App: React.FC = () => {
 
   const themeColor = userProfile.gender === 'Donna' ? 'rose' : 'emerald';
   const isFetchingRef = useRef(false);
+  // Accumula dati profilo durante il setup (passati a PreferencesScreen per il salvataggio finale)
+  const setupProfileRef = useRef<Partial<any>>({});
 
   // --- 1. INITIALIZATION ---
   useEffect(() => {
     if (SecureStorageManager.isBiometricsEnabled()) setIsAppLocked(true);
 
     const init = async () => {
-      // Check for saved Guest ID in LocalStorage first
       const savedGuestId = localStorage.getItem('gymbro_guest_id');
       if (savedGuestId) {
           await loadUserData(savedGuestId);
           return;
       }
-
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
           SecureStorageManager.saveCredentials('access_token', session.access_token);
           await loadUserData(session.user.id);
-      } else { 
-          setIsLoading(false); 
-          setCurrentScreen('login'); 
+      } else {
+          setIsLoading(false);
+          setCurrentScreen('login');
       }
     };
     init();
+
+    // Listener per cambio sessione (token refresh, logout remoto)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+          handleLogoutState();
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+          SecureStorageManager.saveCredentials('access_token', session.access_token);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // --- 2. DATA LOADING (SSOT) ---
@@ -184,7 +194,7 @@ const App: React.FC = () => {
         // 1. Hydrate Profilo
         const loadedProfile: UserProfile = {
             id: userId,
-            name: p.full_name || p.name || 'Utente',
+            name: p.name || p.full_name || 'Utente',
             gender: p.gender || 'Uomo',
             weight: Number(p.weight) || 75,
             height: Number(p.height) || 175,
@@ -278,6 +288,9 @@ const App: React.FC = () => {
         });
 
         setWorkoutSchedule(theoreticalSchedule);
+
+        // Carica community posts
+        initializeMockData(userId);
   };
 
   // --- 4. HELPERS ---
@@ -321,8 +334,15 @@ const App: React.FC = () => {
   }, []);
 
   const initializeMockData = (userId: string) => {
-      setCommunityPosts(DEFAULT_POSTS);
-      const userEntry: LeaderboardEntry = { id: userId, name: 'Tu (Ospite)', workouts: 0, badgesCount: 0, rank: 6, isUser: true };
+      // Carica post da Supabase o usa mock per guest
+      if (userId.startsWith('guest_')) {
+          setCommunityPosts(DEFAULT_POSTS);
+      } else {
+          fetchCommunityPosts().then(posts => {
+              setCommunityPosts(posts.length > 0 ? posts : DEFAULT_POSTS);
+          });
+      }
+      const userEntry: LeaderboardEntry = { id: userId, name: 'Tu', workouts: 0, badgesCount: 0, rank: 6, isUser: true };
       setLeaderboard([...DEFAULT_LEADERBOARD, userEntry].sort((a,b) => b.workouts - a.workouts).map((x,i)=>({...x, rank: i+1})));
   };
 
@@ -406,7 +426,17 @@ const App: React.FC = () => {
           });
 
           setCurrentScreen(nextScreen);
-      } catch (error: any) { console.error("Errore Salvataggio:", error); alert("Errore nel salvataggio dei dati."); } finally { setIsLoading(false); }
+      } catch (error: any) {
+          console.error('Errore Salvataggio:', error);
+          const msg = error.message || 'Errore nel salvataggio.';
+          if (msg.includes('Sessione scaduta')) {
+              if (window.confirm('Sessione scaduta. Vuoi fare il login per salvare i tuoi progressi?')) {
+                  handleLogoutState();
+              }
+          } else {
+              alert('Errore nel salvataggio: ' + msg);
+          }
+      } finally { setIsLoading(false); }
   }, [userStats, sessionUserId]);
 
   // --- 5. RENDER ---
@@ -416,36 +446,39 @@ const App: React.FC = () => {
 
     switch (currentScreen) {
       case 'login': return <LoginScreen onLogin={(mode, userId) => { if(mode==='guest') { handleGuestLogin(); } else if (userId) { setIsLoading(true); loadUserData(userId); } else { setIsLoading(true); supabase.auth.getSession().then(({data}) => data.session ? loadUserData(data.session.user.id) : setIsLoading(false)); } }} />;
-      case 'profile-config': return <ProfileConfigScreen onNext={(d) => { 
-          if(sessionUserId && sessionUserId.startsWith('guest_')) updateGuestProfile(d);
-          setUserProfile(p=>({...p, ...d})); 
-          setCurrentScreen('goal-selection'); 
+      case 'profile-config': return <ProfileConfigScreen onNext={(d) => {
+          setupProfileRef.current = { ...setupProfileRef.current, ...d };
+          setUserProfile(p=>({...p, ...d}));
+          setCurrentScreen('goal-selection');
         }} onSkip={() => {}} />;
-      case 'goal-selection': return <GoalSelectionScreen onFinish={(g) => { 
-          if(sessionUserId && sessionUserId.startsWith('guest_')) updateGuestProfile({goal: g});
-          setUserProfile(p=>({...p, goal: g})); 
-          setCurrentScreen('strength-test'); 
+      case 'goal-selection': return <GoalSelectionScreen onFinish={(g) => {
+          setupProfileRef.current = { ...setupProfileRef.current, goal: g };
+          setUserProfile(p=>({...p, goal: g}));
+          setCurrentScreen('strength-test');
         }} />;
-      case 'strength-test': return <StrengthTestScreen onNext={(d) => { 
+      case 'strength-test': return <StrengthTestScreen onNext={(d) => {
           const safeWeight = parseFloat(d.testWeight.toString());
           const safeReps = parseFloat(d.testReps.toString());
-          if(sessionUserId && sessionUserId.startsWith('guest_')) updateGuestProfile({test_exercise: d.testExercise, test_weight: safeWeight, test_reps: safeReps});
-          setUserProfile(p=>({...p, testExercise: d.testExercise, testWeight: safeWeight, testReps: safeReps})); 
-          setCurrentScreen('plan-generation'); 
+          setupProfileRef.current = { ...setupProfileRef.current, testExercise: d.testExercise, testWeight: safeWeight, testReps: safeReps };
+          setUserProfile(p=>({...p, testExercise: d.testExercise, testWeight: safeWeight, testReps: safeReps}));
+          setCurrentScreen('plan-generation');
       }} />;
-      case 'plan-generation': return <PlanGenerationScreen userProfile={userProfile} onPlanGenerated={(w) => { 
-          if(sessionUserId && sessionUserId.startsWith('guest_')) updateGuestProfile({current_plan: w});
-          setGeneratedWorkouts(w); 
-          setUserProfile(p=>({...p, currentPlan: w})); 
-          setCurrentScreen('preferences'); 
+      case 'plan-generation': return <PlanGenerationScreen userProfile={userProfile} onPlanGenerated={(w) => {
+          setupProfileRef.current = { ...setupProfileRef.current, currentPlan: w };
+          setGeneratedWorkouts(w);
+          setUserProfile(p=>({...p, currentPlan: w}));
+          setCurrentScreen('preferences');
       }} />;
-      case 'preferences': return <PreferencesScreen onNext={(f, days) => { 
-          // Note: Persistence handled inside PreferencesScreen now
-          setUserProfile(p=>({...p, favoriteExercises: f, trainingDays: days}));
-          generateFutureSchedule(generatedWorkouts, days, {});
-          setCurrentScreen('home'); 
-          setTimeout(()=>setShowCoachMarks(true), 1000); 
-      }} />;
+      case 'preferences': return <PreferencesScreen
+          userId={sessionUserId || undefined}
+          accumulatedProfile={setupProfileRef.current}
+          onNext={(f, days) => {
+              setUserProfile(p=>({...p, favoriteExercises: f, trainingDays: days}));
+              generateFutureSchedule(generatedWorkouts, days, {});
+              setupProfileRef.current = {};
+              setCurrentScreen('home');
+              setTimeout(()=>setShowCoachMarks(true), 1000);
+          }} />;
       
       case 'home': return <MemoizedHomeScreen onNavigate={setCurrentScreen} userProfile={userProfile} userStats={userStats} availableWorkouts={generatedWorkouts} onStartWorkout={(id)=>{setSelectedWorkoutId(id); setCurrentScreen('workout');}} isDarkMode={isDarkMode} themeColor={themeColor} notifications={notifications} onMarkNotificationsRead={()=>setNotifications(p=>p.map(n=>({...n, read:true})))} />;
       case 'calendar': return <MemoizedCalendarScreen 
@@ -463,7 +496,34 @@ const App: React.FC = () => {
       />;
       case 'workout': return <WorkoutDetailScreen onBack={()=>setCurrentScreen('home')} initialWorkoutId={selectedWorkoutId} customWorkouts={generatedWorkouts} onWorkoutComplete={(d, e, i, w, n) => { handleWorkoutComplete(d, e, i, w, n); }} onShareToCommunity={(p)=>setCommunityPosts(pr=>[p, ...pr])} isDarkMode={isDarkMode} userProfile={userProfile} />;
       case 'profile': return <ProfileScreen onLogout={handleLogoutState} userProfile={userProfile} userStats={userStats} isDarkMode={isDarkMode} toggleTheme={()=>setIsDarkMode(!isDarkMode)} onEditProfile={()=>setCurrentScreen('profile-config')} themeColor={themeColor} workoutSchedule={workoutSchedule} onDeleteWorkout={(id, date) => { handleDeleteWorkout(id); }} />;
-      case 'community': return <MemoizedCommunityScreen onBack={()=>setCurrentScreen('home')} isDarkMode={isDarkMode} posts={communityPosts} stories={stories} leaderboard={leaderboard} onAddPost={(p)=>setCommunityPosts(pr=>[p, ...pr])} onLikePost={(id)=>setCommunityPosts(p=>p.map(x=>x.id===id?{...x, likes:x.likes+1, liked:true}:x))} onPostComment={()=>{}} userProfile={userProfile} onStartChallenge={(id, name, img, pid, txt)=>{setTempChallengeData(generateSmartChallenge(userStats, name, id, txt)); setSelectedWorkoutId(null); setCurrentScreen('workout');}} onUpdateChallenge={()=>{}} userStats={userStats} challenges={challenges} themeColor={themeColor} />;
+      case 'community': return <MemoizedCommunityScreen
+          onBack={()=>setCurrentScreen('home')}
+          isDarkMode={isDarkMode}
+          posts={communityPosts}
+          stories={stories}
+          leaderboard={leaderboard}
+          onAddPost={async (p) => {
+              if (sessionUserId) {
+                  const saved = await createPost(sessionUserId, { user: p.user, userImage: p.userImage, content: p.content, image: p.image, tag: p.tag });
+                  setCommunityPosts(pr => [saved || p, ...pr]);
+              } else {
+                  setCommunityPosts(pr => [p, ...pr]);
+              }
+          }}
+          onLikePost={async (id) => {
+              const post = communityPosts.find(p => p.id === id);
+              if (!post) return;
+              const newLikes = await toggleLikePost(id, post.likes, post.liked || false);
+              setCommunityPosts(p => p.map(x => x.id===id ? {...x, likes: newLikes, liked: !x.liked} : x));
+          }}
+          onPostComment={()=>{}}
+          userProfile={userProfile}
+          onStartChallenge={(id, name, img, pid, txt)=>{setTempChallengeData(generateSmartChallenge(userStats, name, id, txt)); setSelectedWorkoutId(null); setCurrentScreen('workout');}}
+          onUpdateChallenge={()=>{}}
+          userStats={userStats}
+          challenges={challenges}
+          themeColor={themeColor}
+      />;
       default: return <LoginScreen onLogin={()=>{}} />;
     }
   };
