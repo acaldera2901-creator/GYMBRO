@@ -415,7 +415,7 @@ const App: React.FC = () => {
     if (isAppLocked) return <BiometricGate onUnlock={() => setIsAppLocked(false)} isDarkMode={isDarkMode} />;
 
     switch (currentScreen) {
-      case 'login': return <LoginScreen onLogin={(mode) => { if(mode==='guest') { handleGuestLogin(); } else { setIsLoading(true); supabase.auth.getSession().then(({data}) => data.session ? loadUserData(data.session.user.id) : setIsLoading(false)); } }} />;
+      case 'login': return <LoginScreen onLogin={(mode, userId) => { if(mode==='guest') { handleGuestLogin(); } else if (userId) { setIsLoading(true); loadUserData(userId); } else { setIsLoading(true); supabase.auth.getSession().then(({data}) => data.session ? loadUserData(data.session.user.id) : setIsLoading(false)); } }} />;
       case 'profile-config': return <ProfileConfigScreen onNext={(d) => { 
           if(sessionUserId && sessionUserId.startsWith('guest_')) updateGuestProfile(d);
           setUserProfile(p=>({...p, ...d})); 

@@ -4,7 +4,7 @@ import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle, User } from 
 import { supabase } from '../lib/supabase';
 
 interface LoginScreenProps {
-  onLogin: (mode?: string) => void;
+  onLogin: (mode?: string, userId?: string) => void;
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
@@ -28,16 +28,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
     try {
       if (isLoginMode) {
-        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) throw error;
-        onLogin();
+        if (!data.session) throw new Error('Sessione non disponibile. Riprova.');
+        onLogin(undefined, data.session.user.id);
       } else {
         const { data, error } = await supabase.auth.signUp({ email: cleanEmail, password });
         if (error) throw error;
-        if (data.session) onLogin();
-        else {
-            // Se serve conferma email, in questo template assumiamo login diretto o mostriamo msg
-            onLogin(); 
+        if (data.session) {
+          onLogin(undefined, data.session.user.id);
+        } else if (data.user) {
+          setErrorMsg('Controlla la tua email per confermare la registrazione, poi accedi.');
+          setIsLoginMode(true);
+          setIsLoading(false);
+          return;
+        } else {
+          throw new Error('Registrazione fallita. Riprova.');
         }
       }
     } catch (error: any) {
