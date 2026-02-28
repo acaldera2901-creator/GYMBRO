@@ -91,11 +91,6 @@ const App: React.FC = () => {
     if (SecureStorageManager.isBiometricsEnabled()) setIsAppLocked(true);
 
     const init = async () => {
-      const savedGuestId = localStorage.getItem('gymbro_guest_id');
-      if (savedGuestId) {
-          await loadUserData(savedGuestId);
-          return;
-      }
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
           SecureStorageManager.saveCredentials('access_token', session.access_token);
@@ -127,29 +122,7 @@ const App: React.FC = () => {
     try {
         setSessionUserId(userId);
 
-        // A. GUEST FLOW
-        if (userId.startsWith('guest_')) {
-            const guestData = await fetchUserData(userId); 
-            
-            // Fix "Chi Sei" Loop: Check setup_completed flag or specific fields
-            const p = guestData?.profile || {};
-            const isSetupComplete = p.setup_completed || (p.name && p.training_days && p.training_days.length > 0);
-
-            if (!guestData || !isSetupComplete) {
-                // User exists but setup is incomplete
-                setUserProfile(prev => ({...prev, id: userId, ...p}));
-                setCurrentScreen('profile-config');
-            } else {
-                // User has data, hydrate properly
-                hydrateFromData(userId, guestData);
-                setCurrentScreen('home');
-            }
-            setIsLoading(false);
-            isFetchingRef.current = false;
-            return;
-        }
-
-        // B. AUTHENTICATED FLOW
+        // AUTHENTICATED FLOW
         const dbData = await fetchUserData(userId);
         
         // Se dbData è null o non ha profilo, è un nuovo utente Auth
@@ -334,33 +307,15 @@ const App: React.FC = () => {
   }, []);
 
   const initializeMockData = (userId: string) => {
-      // Carica post da Supabase o usa mock per guest
-      if (userId.startsWith('guest_')) {
-          setCommunityPosts(DEFAULT_POSTS);
-      } else {
-          fetchCommunityPosts().then(posts => {
-              setCommunityPosts(posts.length > 0 ? posts : DEFAULT_POSTS);
-          });
-      }
+      fetchCommunityPosts().then(posts => {
+          setCommunityPosts(posts.length > 0 ? posts : DEFAULT_POSTS);
+      });
       const userEntry: LeaderboardEntry = { id: userId, name: 'Tu', workouts: 0, badgesCount: 0, rank: 6, isUser: true };
       setLeaderboard([...DEFAULT_LEADERBOARD, userEntry].sort((a,b) => b.workouts - a.workouts).map((x,i)=>({...x, rank: i+1})));
   };
 
-  const handleGuestLogin = async () => {
-      setIsLoading(true);
-      // Generate a unique guest ID
-      const guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      
-      // Save it to localStorage
-      localStorage.setItem('gymbro_guest_id', guestId);
-      
-      // Proceed to load data (which handles initialization)
-      await loadUserData(guestId);
-  };
-
   const handleLogoutState = useCallback(() => {
       SecureStorageManager.clearCredentials('access_token');
-      localStorage.removeItem('gymbro_guest_id'); // Clear guest session
       setSessionUserId(null); setUserProfile(DEFAULT_PROFILE); setUserStats(DEFAULT_STATS);
       setGeneratedWorkouts([]); setWorkoutSchedule({}); setCommunityPosts([]);
       setCurrentScreen('login'); setIsLoading(false);
@@ -445,7 +400,7 @@ const App: React.FC = () => {
     if (isAppLocked) return <BiometricGate onUnlock={() => setIsAppLocked(false)} isDarkMode={isDarkMode} />;
 
     switch (currentScreen) {
-      case 'login': return <LoginScreen onLogin={(mode, userId) => { if(mode==='guest') { handleGuestLogin(); } else if (userId) { setIsLoading(true); loadUserData(userId); } else { setIsLoading(true); supabase.auth.getSession().then(({data}) => data.session ? loadUserData(data.session.user.id) : setIsLoading(false)); } }} />;
+      case 'login': return <LoginScreen onLogin={(mode, userId) => { if (userId) { setIsLoading(true); loadUserData(userId); } else { setIsLoading(true); supabase.auth.getSession().then(({data}) => data.session ? loadUserData(data.session.user.id) : setIsLoading(false)); } }} />;
       case 'profile-config': return <ProfileConfigScreen onNext={(d) => {
           setupProfileRef.current = { ...setupProfileRef.current, ...d };
           setUserProfile(p=>({...p, ...d}));

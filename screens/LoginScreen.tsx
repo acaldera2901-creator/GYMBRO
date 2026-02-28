@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle, User } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface LoginScreenProps {
@@ -58,10 +58,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       setErrorMsg(msg || 'Si è verificato un errore.');
       setIsLoading(false);
     }
-  };
-
-  const handleGuestLogin = () => {
-      onLogin('guest');
   };
 
   return (
@@ -171,18 +167,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     {!isLoading && <ArrowRight size={20} strokeWidth={3} />}
                 </button>
 
-                <div className="relative flex items-center py-2">
-                    <div className="flex-grow border-t border-white/10"></div>
-                    <span className="flex-shrink-0 mx-4 text-[10px] text-slate-500 uppercase font-bold">Oppure</span>
-                    <div className="flex-grow border-t border-white/10"></div>
-                </div>
 
-                <button 
-                    onClick={handleGuestLogin}
-                    className="w-full bg-[#1c1c1e] hover:bg-[#2c2c2e] text-slate-300 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors text-sm border border-white/5"
-                >
-                    <User size={16} /> Entra come Ospite
-                </button>
             </div>
         </div>
 
