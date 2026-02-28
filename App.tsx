@@ -495,7 +495,25 @@ const App: React.FC = () => {
           themeColor={themeColor} 
       />;
       case 'workout': return <WorkoutDetailScreen onBack={()=>setCurrentScreen('home')} initialWorkoutId={selectedWorkoutId} customWorkouts={generatedWorkouts} onWorkoutComplete={(d, e, i, w, n) => { handleWorkoutComplete(d, e, i, w, n); }} onShareToCommunity={(p)=>setCommunityPosts(pr=>[p, ...pr])} isDarkMode={isDarkMode} userProfile={userProfile} />;
-      case 'profile': return <ProfileScreen onLogout={handleLogoutState} userProfile={userProfile} userStats={userStats} isDarkMode={isDarkMode} toggleTheme={()=>setIsDarkMode(!isDarkMode)} onEditProfile={()=>setCurrentScreen('profile-config')} themeColor={themeColor} workoutSchedule={workoutSchedule} onDeleteWorkout={(id, date) => { handleDeleteWorkout(id); }} />;
+      case 'profile': return <ProfileScreen
+          onLogout={handleLogoutState}
+          userProfile={userProfile}
+          userStats={userStats}
+          isDarkMode={isDarkMode}
+          toggleTheme={()=>setIsDarkMode(!isDarkMode)}
+          onEditProfile={()=>setCurrentScreen('profile-config')}
+          themeColor={themeColor}
+          workoutSchedule={workoutSchedule}
+          onDeleteWorkout={(id, date) => { handleDeleteWorkout(id); }}
+          onProfileUpdated={(profileUpdates, statsUpdates) => {
+              setUserProfile(p => ({ ...p, ...profileUpdates }));
+              setUserStats(p => ({
+                  ...p,
+                  ...statsUpdates,
+                  maxes: statsUpdates.maxes ? { ...p.maxes, ...statsUpdates.maxes } : p.maxes
+              }));
+          }}
+      />;
       case 'community': return <MemoizedCommunityScreen
           onBack={()=>setCurrentScreen('home')}
           isDarkMode={isDarkMode}
