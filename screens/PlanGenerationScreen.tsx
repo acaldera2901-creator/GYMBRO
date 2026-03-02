@@ -226,26 +226,26 @@ const EXERCISE_RATIOS: Record<string, { base: 'bench' | 'squat' | 'deadlift', ra
     'SS: Panca Piana': { base: 'bench', ratio: 0.8 }, // Lower for superset
     'Spinte Manubri Inclinata': { base: 'bench', ratio: 0.7 },
     'Panca Inclinata Manubri': { base: 'bench', ratio: 0.7 },
-    'Dip alle Parallele': { base: 'bench', ratio: 0.9 },
-    'Dip': { base: 'bench', ratio: 0.9 },
+    'Dip alle Parallele': { base: 'bench', ratio: 0.40 },  // Peso aggiunto ai dip ≈ 40% bench (era 0.9: impossibile)
+    'Dip': { base: 'bench', ratio: 0.40 },
     'Croci ai Cavi alti': { base: 'bench', ratio: 0.3 },
     'French Press Bil. EZ': { base: 'bench', ratio: 0.35 },
     'Pushdown Corda': { base: 'bench', ratio: 0.35 },
     'Pushdown': { base: 'bench', ratio: 0.35 },
     'SS: French Press': { base: 'bench', ratio: 0.3 },
     
-    'Trazioni': { base: 'bench', ratio: 0.9 }, // Bodyweight assisted usually
-    'Trazioni (o Lat Machine)': { base: 'bench', ratio: 0.9 },
-    'Rematore Bilanciere': { base: 'bench', ratio: 0.8 },
-    'Rematore con Bilanciere': { base: 'bench', ratio: 0.8 },
-    'SS: Rematore Bil.': { base: 'bench', ratio: 0.6 },
-    'Pulley Basso': { base: 'bench', ratio: 0.7 },
-    'Pulley Basso (presa stretta)': { base: 'bench', ratio: 0.7 },
-    'Pull-over al cavo alto': { base: 'bench', ratio: 0.4 },
-    'Curl Bilanciere': { base: 'bench', ratio: 0.4 },
-    'Curl con Bilanciere': { base: 'bench', ratio: 0.4 },
-    'Curl a Martello (Hammer)': { base: 'bench', ratio: 0.35 },
-    'Hammer Curl': { base: 'bench', ratio: 0.35 },
+    'Trazioni': { base: 'bench', ratio: 0.65 },          // Lat pulldown ≈ 65% bench (era 0.9: troppo)
+    'Trazioni (o Lat Machine)': { base: 'bench', ratio: 0.65 },
+    'Rematore Bilanciere': { base: 'bench', ratio: 0.80 },
+    'Rematore con Bilanciere': { base: 'bench', ratio: 0.80 },
+    'SS: Rematore Bil.': { base: 'bench', ratio: 0.65 },
+    'Pulley Basso': { base: 'bench', ratio: 0.70 },
+    'Pulley Basso (presa stretta)': { base: 'bench', ratio: 0.70 },
+    'Pull-over al cavo alto': { base: 'bench', ratio: 0.40 },
+    'Curl Bilanciere': { base: 'bench', ratio: 0.38 },
+    'Curl con Bilanciere': { base: 'bench', ratio: 0.38 },
+    'Curl a Martello (Hammer)': { base: 'bench', ratio: 0.28 },
+    'Hammer Curl': { base: 'bench', ratio: 0.28 },
     
     'Squat': { base: 'squat', ratio: 1.0 },
     'Squat con Bilanciere': { base: 'squat', ratio: 1.0 },
@@ -285,11 +285,11 @@ const EXERCISE_RATIOS: Record<string, { base: 'bench' | 'squat' | 'deadlift', ra
     'Kettlebell Swing': { base: 'deadlift', ratio: 0.3 },
     'Thruster (Squat + Press)': { base: 'bench', ratio: 0.45 },
     'Step Up': { base: 'squat', ratio: 0.3 },
-    'Chest Press': { base: 'bench', ratio: 0.8 },
-    'Chest Press Machine': { base: 'bench', ratio: 0.8 },
-    'Lat Machine': { base: 'bench', ratio: 0.75 },
-    'Lat Machine avanti': { base: 'bench', ratio: 0.75 },
-    'Curl Bicipiti Cavi': { base: 'bench', ratio: 0.3 },
+    'Chest Press': { base: 'bench', ratio: 0.85 },          // macchina ≈ leggermente più facile del bilanciere
+    'Chest Press Machine': { base: 'bench', ratio: 0.85 },
+    'Lat Machine': { base: 'bench', ratio: 0.65 },           // lat pulldown = simile a Trazioni
+    'Lat Machine avanti': { base: 'bench', ratio: 0.65 },
+    'Curl Bicipiti Cavi': { base: 'bench', ratio: 0.28 },
 };
 
 const PlanGenerationScreen: React.FC<PlanGenerationScreenProps> = ({ userProfile, onPlanGenerated }) => {
@@ -401,20 +401,15 @@ const PlanGenerationScreen: React.FC<PlanGenerationScreenProps> = ({ userProfile
 
         for (const catKey of sortedCategories) {
              // Determina l'intensità in base all'obiettivo
-             let percentage = 0.75; 
              let focusSuffix = "Ipertrofia";
 
              if (catKey === 'definition') {
-                percentage = 0.65; // Definizione: carichi medio-alti, volume alto
                 focusSuffix = "Definizione";
              } else if (catKey === 'endurance') {
-                percentage = 0.50; // Resistenza: carichi bassi, altissime rip
                 focusSuffix = "Resistenza";
              } else if (catKey === 'weight_loss') {
-                percentage = 0.60; // Perdita peso: circuiti, carichi moderati
                 focusSuffix = "Metabolico";
              } else {
-                percentage = 0.75; // Massa: 70-80% 1RM
                 focusSuffix = "Massa";
              }
 
@@ -434,46 +429,72 @@ const PlanGenerationScreen: React.FC<PlanGenerationScreenProps> = ({ userProfile
                 });
 
                 const updatedExercises = tpl.exercises.map(ex => {
-                    // Cerca il ratio per l'esercizio corrente
-                    // Prima cerca match esatto, poi parziale
-                    const exKey = Object.keys(EXERCISE_RATIOS).find(k => ex.name.toLowerCase() === k.toLowerCase());
-                    const fallbackKey = Object.keys(EXERCISE_RATIOS).find(k => ex.name.toLowerCase().includes(k.toLowerCase()));
-                    
+                    const exNameLower = (ex.name ?? '').toLowerCase();
+                    const repsStr = ex.reps ?? '';
+
+                    // Cerca il ratio per l'esercizio corrente (match esatto poi parziale)
+                    const exKey = Object.keys(EXERCISE_RATIOS).find(k => exNameLower === k.toLowerCase());
+                    const fallbackKey = Object.keys(EXERCISE_RATIOS).find(k => exNameLower.includes(k.toLowerCase()));
                     const finalKey = exKey || fallbackKey;
 
-                    let weightString = "";
-                    let finalReps = ex.reps; 
+                    let finalReps = repsStr;
 
-                    // Applica il calcolo SOLO se troviamo una chiave valida e non è a corpo libero/tempo
-                    if (finalKey && !ex.reps.toLowerCase().includes('bodyweight') && !ex.reps.toLowerCase().includes('max') && !ex.reps.toLowerCase().includes('sec')) {
-                        const ratioData = EXERCISE_RATIOS[finalKey];
-                        if (ratioData) {
+                    // Salta esercizi a corpo libero, a tempo, o senza ratio
+                    const skipWords = ['bodyweight', 'max', 'sec', 'min', '"', 'totali', 'totale', '/lato', 'm (rec', 'x 500', 'x 40m', 'reps'];
+                    const repsLower = repsStr.toLowerCase();
+                    const shouldSkip = !finalKey || skipWords.some(w => repsLower.includes(w));
+
+                    if (!shouldSkip) {
+                        const ratioData = EXERCISE_RATIOS[finalKey as string];
+                        if (ratioData && estimatedStats[ratioData.base] > 0) {
                             const base1RM = estimatedStats[ratioData.base];
                             
-                            // CALCOLO COACH ESPERTO: 1RM * RatioEsercizio * PercentualeObiettivo
-                            let calculatedWeight = base1RM * ratioData.ratio * percentage;
+                            // % 1RM basata sul rep range reale (formula Epley inversa)
+                            const parseTargetReps = (rStr: string): number => {
+                                const clean = rStr.replace(/\(.*?\)/g, '').trim();
+                                const rangeMatch = clean.match(/(\d+)\s*[-–]\s*(\d+)/);
+                                if (rangeMatch) return parseInt(rangeMatch[2]);
+                                const singleMatch = clean.match(/\d+\s*[x×X]\s*(\d+)/i);
+                                if (singleMatch) return parseInt(singleMatch[1]);
+                                const fallback = clean.match(/(\d+)/);
+                                return fallback ? parseInt(fallback[1]) : 10;
+                            };
+
+                            const repsToWorkingPct = (reps: number): number => {
+                                if (reps <= 1)  return 0.95;
+                                if (reps <= 3)  return 0.90;
+                                if (reps <= 5)  return 0.85;
+                                if (reps <= 6)  return 0.82;
+                                if (reps <= 8)  return 0.77;
+                                if (reps <= 10) return 0.72;
+                                if (reps <= 12) return 0.67;
+                                if (reps <= 15) return 0.63;
+                                if (reps <= 20) return 0.56;
+                                return 0.50;
+                            };
+
+                            const targetReps = parseTargetReps(repsStr);
+                            const workingPct = repsToWorkingPct(targetReps);
                             
-                            // ARROTONDAMENTO COACH ESPERTO: Ai 2.5kg più vicini (o 1kg per pesi piccoli)
-                            if (ratioData.ratio < 0.2 || calculatedWeight < 10) {
-                                // Per pesi piccoli (es. alzate laterali), arrotonda al kg o mezzo kg
-                                calculatedWeight = Math.round(calculatedWeight); 
+                            let calculatedWeight = base1RM * ratioData.ratio * workingPct;
+
+                            // Arrotonda (1kg per pesi piccoli, 2.5kg per carichi normali)
+                            if (calculatedWeight < 10 || ratioData.ratio <= 0.2) {
+                                calculatedWeight = Math.round(calculatedWeight);
                             } else {
-                                // Arrotonda ai 2.5kg più vicini
                                 calculatedWeight = Math.round(calculatedWeight / 2.5) * 2.5;
                             }
 
-                            // Evita pesi negativi o zero se l'utente è molto debole
-                            if (calculatedWeight < 2 && calculatedWeight > 0) calculatedWeight = 2;
-
-                            if (calculatedWeight > 0) {
-                                weightString = ` @ ${calculatedWeight}kg`;
+                            if (calculatedWeight >= 2) {
+                                // Carico nel campo reps — nome rimane SEMPRE pulito
+                                finalReps = `${repsStr} @ ${calculatedWeight}kg`;
                             }
                         }
                     }
 
                     return {
                         ...ex,
-                        name: `${ex.name}${weightString}`, // Appende il carico al nome
+                        name: ex.name,
                         reps: finalReps
                     };
                 });

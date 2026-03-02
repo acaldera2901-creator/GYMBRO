@@ -249,7 +249,7 @@ const EditProfileModal: React.FC<{
                 </div>
 
                 {/* Save Button */}
-                <div className="px-6 pb-8 pt-4 bg-[#111] border-t border-zinc-800/50">
+                <div className="px-6 pt-4 pb-10 bg-[#111] border-t border-zinc-800/50" style={{paddingBottom: 'max(2.5rem, calc(env(safe-area-inset-bottom) + 1rem))'}}>
                     <button
                         onClick={handleSave}
                         disabled={isSaving}

@@ -327,8 +327,6 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   const [showRecap, setShowRecap] = useState(false);
   const [customImage, setCustomImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const startTimeRef = useRef<number>(0);
 
   const theme = {
       bg: isDarkMode ? 'bg-black' : 'bg-[#f2f2f7]',
@@ -363,10 +361,9 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
     }
   }, [initialWorkoutId, activeDatabase, hasWorkouts]);
 
-  const { filteredWorkouts, displayWorkouts } = useMemo(() => {
+  const { displayWorkouts } = useMemo(() => {
       const filtered = activeDatabase.filter(w => w.category === selectedCategory);
       return { 
-          filteredWorkouts: filtered,
           displayWorkouts: filtered.length > 0 ? filtered : activeDatabase
       };
   }, [activeDatabase, selectedCategory]);
@@ -374,38 +371,29 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   const currentInfo = CATEGORY_INFO[selectedCategory] || CATEGORY_INFO['Massa'];
   const currentHeroImage = gender === 'Donna' ? currentInfo.imageWomen : currentInfo.imageMen;
 
+  // TIMER ALLENAMENTO: conta SOLO quando la sessione è attiva e NON si sta riposando
   useEffect(() => {
-    let interval: any;
-    
-    if (isSessionActive && startTimeRef.current === 0) {
-        startTimeRef.current = Date.now();
-    }
-
-    if (isSessionActive) {
-        interval = setInterval(() => {
-            const now = Date.now();
-            const delta = Math.floor((now - startTimeRef.current) / 1000);
-            setElapsedSeconds(delta);
-        }, 1000);
-    } else {
-        startTimeRef.current = 0;
-    }
-    
-    if (isSessionActive && isResting && !isRestPaused) {
-        const restInterval = setInterval(() => {
-            setRestTimeRemaining(p => {
-                if (p <= 1) { 
-                    setIsResting(false); 
-                    return 0; 
-                }
-                return p - 1;
-            });
-        }, 1000);
-        return () => { clearInterval(interval); clearInterval(restInterval); }
-    }
-
+    if (!isSessionActive || isResting) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
     return () => clearInterval(interval);
-  }, [isSessionActive, isResting, isRestPaused]);
+  }, [isSessionActive, isResting]);
+
+  // TIMER RECUPERO: conto alla rovescia separato, indipendente dal timer principale
+  useEffect(() => {
+    if (!isResting || isRestPaused) return;
+    const interval = setInterval(() => {
+      setRestTimeRemaining(prev => {
+        if (prev <= 1) {
+          setIsResting(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isResting, isRestPaused]);
 
   const handleSetCompletion = (exIdx: number, setIdx: number) => {
       const key = `${exIdx}-${setIdx}`;
@@ -421,8 +409,8 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
           return newSet;
       });
 
-      if (!isAlreadyCompleted) {
-          const duration = CATEGORY_INFO[activeWorkout!.category]?.restSeconds || 60;
+      if (!isAlreadyCompleted && activeWorkout) {
+          const duration = (CATEGORY_INFO[activeWorkout.category as keyof typeof CATEGORY_INFO] ?? CATEGORY_INFO['Massa']).restSeconds;
           setTotalRestTime(duration); 
           setRestTimeRemaining(duration); 
           setIsResting(true);
@@ -431,6 +419,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   };
 
   const endSession = () => { setIsSessionActive(false); setShowRecap(true); };
+  
   
   const finishAndShare = () => {
       if (!activeWorkout) return;
@@ -461,7 +450,6 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
       setActiveWorkout(null); 
       setElapsedSeconds(0); 
       setCompletedSets(new Set());
-      startTimeRef.current = 0;
   };
 
   if (isSessionActive && activeWorkout) {
@@ -526,8 +514,13 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
               
               <div className="flex-1 overflow-y-auto px-5 pt-28 pb-32 space-y-4">
                   {activeWorkout.exercises.map((ex, idx) => {
-                      const setsCompleted = Array.from({length: 3}).filter((_, si) => completedSets.has(`${idx}-${si}`)).length;
-                      const isFullyDone = setsCompleted === 3;
+                      // Parsa il numero di serie dal campo reps (null-safe): "4 x 6-8 @ 60kg" → 4
+                      const repsStr = ex.reps ?? '';
+                      const clean = repsStr.split('@')[0].trim();
+                      const match = clean.match(/^(\d+)\s*[x×X]/i);
+                      const setsCount = match ? Math.max(1, Math.min(6, parseInt(match[1]))) : 3;
+                      const setsCompleted = Array.from({length: setsCount}).filter((_, si) => completedSets.has(`${idx}-${si}`)).length;
+                      const isFullyDone = setsCompleted === setsCount;
                       return (
                           <div key={idx} className={`rounded-[1.5rem] p-5 border transition-all duration-300 ${isFullyDone ? 'bg-zinc-900/50 border-white/5 opacity-60' : 'bg-[#1c1c1e] border-white/10 shadow-lg'}`}>
                               <div className="flex justify-between items-start mb-5">
@@ -538,7 +531,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                                   {isFullyDone && <div className="bg-emerald-500/20 text-emerald-500 p-1.5 rounded-full"><CheckCircle2 size={16}/></div>}
                               </div>
                               <div className="flex gap-2.5">
-                                  {Array.from({length: 3}).map((_, setIdx) => {
+                                  {Array.from({length: setsCount}).map((_, setIdx) => {
                                       const isDone = completedSets.has(`${idx}-${setIdx}`);
                                       return (
                                           <button key={setIdx} onClick={() => handleSetCompletion(idx, setIdx)} className={`flex-1 h-12 rounded-lg font-bold flex items-center justify-center transition-all duration-200 text-sm ${isDone ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}>
@@ -679,7 +672,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   return (
       <div className={`min-h-screen ${theme.bg} pb-24`}>
           <div className="relative h-[50vh]">
-              <img src={gender === 'Donna' ? CATEGORY_INFO[activeWorkout.category].imageWomen : CATEGORY_INFO[activeWorkout.category].imageMen} className="w-full h-full object-cover" />
+              <img src={gender === 'Donna' ? (CATEGORY_INFO[activeWorkout.category] || CATEGORY_INFO['Massa']).imageWomen : (CATEGORY_INFO[activeWorkout.category] || CATEGORY_INFO['Massa']).imageMen} className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
               <button onClick={() => setActiveWorkout(null)} className="absolute top-14 left-6 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center"><ChevronLeft size={24}/></button>
               

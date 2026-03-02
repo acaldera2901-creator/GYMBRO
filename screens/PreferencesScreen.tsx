@@ -4,7 +4,7 @@ import { saveFullProfile } from '../lib/supabase';
 import { UserProfile } from '../types';
 
 interface PreferencesScreenProps {
-  onNext: (favorites: string[], trainingDays: number[]) => void;
+  onNext: (favorites: string[], trainingDays: number[], image?: string | null) => void;
   userId?: string;
   accumulatedProfile?: Partial<UserProfile>;
 }
@@ -54,24 +54,30 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ onNext, userId, a
       setIsSaving(true);
       setSaveError(null);
       try {
-          // Salva TUTTO il profilo accumulato negli step precedenti in un'unica chiamata
+          const finalImage = image || accumulatedProfile?.image || null;
           const fullProfileData = {
               ...accumulatedProfile,
               favoriteExercises: selected,
               trainingDays: trainingDays,
-              image: image || accumulatedProfile?.image,
+              image: finalImage,
               maxes: accumulatedProfile?.maxes,
               setup_completed: true
           };
 
           if (userId) {
+              console.log('[Setup] Saving profile for userId:', userId, 'trainingDays:', trainingDays);
               await saveFullProfile(userId, fullProfileData);
+              console.log('[Setup] Profile saved OK');
           }
 
-          onNext(selected, trainingDays);
+          // FIX: passa anche l'immagine a App.tsx tramite callback
+          onNext(selected, trainingDays, finalImage);
       } catch (err: any) {
-          console.error('Setup save error:', err);
-          setSaveError(err.message || 'Errore nel salvataggio. Riprova.');
+          console.error('[Setup] Save error:', err);
+          const msg = err.message || 'Errore nel salvataggio. Riprova.';
+          setSaveError(msg.includes('Profile save failed') 
+              ? 'Errore salvataggio su server: ' + msg 
+              : msg);
           setIsSaving(false);
       }
   };
