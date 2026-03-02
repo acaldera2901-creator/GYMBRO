@@ -643,7 +643,15 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
             </div>
 
             <div className="px-6 space-y-4">
-                <h3 className={`text-xl font-bold ${theme.text}`}>Tutti i piani</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-xl font-bold ${theme.text}`}>Tutti i piani</h3>
+                  {onCreateWorkout && (
+                    <button onClick={onCreateWorkout} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 active:scale-95 transition-transform">
+                      <Plus size={13} className="text-emerald-400" />
+                      <span className="text-emerald-400 text-xs font-bold">Crea</span>
+                    </button>
+                  )}
+                </div>
                 {displayWorkouts.map((w) => (
                     <div key={w.id} onClick={() => setActiveWorkout(w)} className={`flex items-center gap-4 p-4 rounded-3xl cursor-pointer active:scale-98 transition-transform ${theme.card}`}>
                         <div className={`w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center shrink-0 text-zinc-600`}>

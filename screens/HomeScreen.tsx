@@ -82,14 +82,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <p className="text-zinc-600 text-xs mt-1">Giorno di riposo 💤</p>
             )}
           </div>
-          <button onClick={handleToggleNotif} className="relative w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center active:scale-90 transition-transform">
-            {showNotifications ? <X size={18} className="text-zinc-400" /> : <Bell size={18} className="text-zinc-400" />}
-            {unreadCount > 0 && !showNotifications && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-[#080808] flex items-center justify-center">
-                <span className="text-[8px] font-black text-white">{unreadCount}</span>
-              </div>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Foto profilo piccola */}
+            <button onClick={() => onNavigate('profile')} className="w-10 h-10 rounded-2xl overflow-hidden border-2 active:scale-90 transition-transform shrink-0" style={{ borderColor: accentHex }}>
+              {userProfile.image ? (
+                <img src={userProfile.image} alt="profilo" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: `${accentHex}25` }}>
+                  <span className="text-sm font-black" style={{ color: accentHex }}>{firstName.charAt(0).toUpperCase()}</span>
+                </div>
+              )}
+            </button>
+            <button onClick={handleToggleNotif} className="relative w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center active:scale-90 transition-transform">
+              {showNotifications ? <X size={18} className="text-zinc-400" /> : <Bell size={18} className="text-zinc-400" />}
+              {unreadCount > 0 && !showNotifications && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-[#080808] flex items-center justify-center">
+                  <span className="text-[8px] font-black text-white">{unreadCount}</span>
+                </div>
+              )}
+            </button>
+          </div>
         </div>
 
         {showNotifications && (

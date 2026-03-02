@@ -14,7 +14,6 @@ import CommunityScreen from './screens/CommunityScreen';
 import CustomWorkoutBuilder from './screens/CustomWorkoutBuilder';
 import BottomNav from './components/BottomNav';
 import CoachMarks, { Step } from './components/CoachMarks';
-import BiometricGate from './components/BiometricGate';
 import { ScreenName, UserProfile, WorkoutCard, UserStats, Post, Badge, Challenge, AppNotification, Story, LeaderboardEntry, Comment, ChallengeStatus } from './types';
 import { supabase, fetchUserData, completeWorkoutTransaction, revertWorkoutTransaction, updateGuestProfile, saveFullProfile, fetchCommunityPosts, createPost, toggleLikePost } from './lib/supabase';
 import { Loader2, Medal } from 'lucide-react';
@@ -62,7 +61,6 @@ const App: React.FC = () => {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('login');
-  const [isAppLocked, setIsAppLocked] = useState(false);
   
   // Data State
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_PROFILE);
@@ -89,8 +87,6 @@ const App: React.FC = () => {
 
   // --- 1. INITIALIZATION ---
   useEffect(() => {
-    if (SecureStorageManager.isBiometricsEnabled()) setIsAppLocked(true);
-
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -398,8 +394,6 @@ const App: React.FC = () => {
   // --- 5. RENDER ---
   const renderScreen = () => {
     if (isLoading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="text-emerald-500 animate-spin" size={48} /></div>;
-    if (isAppLocked) return <BiometricGate onUnlock={() => setIsAppLocked(false)} isDarkMode={isDarkMode} />;
-
     switch (currentScreen) {
       case 'login': return <LoginScreen onLogin={(mode, userId) => { if (userId) { setIsLoading(true); loadUserData(userId); } else { setIsLoading(true); supabase.auth.getSession().then(({data}) => data.session ? loadUserData(data.session.user.id) : setIsLoading(false)); } }} />;
       case 'profile-config': return <ProfileConfigScreen onNext={(d) => {
@@ -410,7 +404,13 @@ const App: React.FC = () => {
       case 'goal-selection': return <GoalSelectionScreen onFinish={(g) => {
           setupProfileRef.current = { ...setupProfileRef.current, goal: g };
           setUserProfile(p=>({...p, goal: g}));
-          setCurrentScreen('strength-test');
+          if (g === 'custom') {
+            // Salta il piano generato, vai alle preferenze con scheda vuota
+            setupProfileRef.current = { ...setupProfileRef.current, currentPlan: [] };
+            setCurrentScreen('preferences');
+          } else {
+            setCurrentScreen('strength-test');
+          }
         }} />;
       case 'strength-test': return <StrengthTestScreen onNext={(d) => {
           const safeWeight = parseFloat(d.testWeight.toString());
@@ -453,9 +453,15 @@ const App: React.FC = () => {
           onNext={(f, days) => {
               setUserProfile(p=>({...p, favoriteExercises: f, trainingDays: days}));
               generateFutureSchedule(generatedWorkouts, days, {});
+              const isCustomGoal = setupProfileRef.current?.goal === 'custom';
               setupProfileRef.current = {};
               setCurrentScreen('home');
-              setTimeout(()=>setShowCoachMarks(true), 1000);
+              if (isCustomGoal) {
+                // Se obiettivo personalizzato, apri subito il builder
+                setTimeout(() => setCurrentScreen('custom-workout-builder'), 300);
+              } else {
+                setTimeout(()=>setShowCoachMarks(true), 1000);
+              }
           }} />;
       
       case 'home': return <MemoizedHomeScreen onNavigate={setCurrentScreen} userProfile={userProfile} userStats={userStats} availableWorkouts={generatedWorkouts} onStartWorkout={(id)=>{setSelectedWorkoutId(id); setCurrentScreen('workout');}} isDarkMode={isDarkMode} themeColor={themeColor} notifications={notifications} onMarkNotificationsRead={()=>setNotifications(p=>p.map(n=>({...n, read:true})))} />;
@@ -472,7 +478,7 @@ const App: React.FC = () => {
           isDarkMode={isDarkMode} 
           themeColor={themeColor} 
       />;
-      case 'workout': return <WorkoutDetailScreen onBack={()=>setCurrentScreen('home')} initialWorkoutId={selectedWorkoutId} customWorkouts={generatedWorkouts} onWorkoutComplete={(d, e, i, w, n) => { handleWorkoutComplete(d, e, i, w, n); }} onShareToCommunity={(p)=>setCommunityPosts(pr=>[p, ...pr])} isDarkMode={isDarkMode} userProfile={userProfile} />;
+      case 'workout': return <WorkoutDetailScreen onBack={()=>setCurrentScreen('home')} initialWorkoutId={selectedWorkoutId} customWorkouts={generatedWorkouts} onWorkoutComplete={(d, e, i, w, n) => { handleWorkoutComplete(d, e, i, w, n); }} onShareToCommunity={(p)=>setCommunityPosts(pr=>[p, ...pr])} isDarkMode={isDarkMode} userProfile={userProfile} onCreateWorkout={() => { setCurrentScreen('custom-workout-builder'); }} />;
       case 'profile': return <ProfileScreen
           onLogout={handleLogoutState}
           userProfile={userProfile}
@@ -521,13 +527,13 @@ const App: React.FC = () => {
           themeColor={themeColor}
       />;
       case 'custom-workout-builder': return <CustomWorkoutBuilder
-          onBack={() => setCurrentScreen('home')}
+          onBack={() => setCurrentScreen('workout')}
           onSave={(workout) => {
             const updated = [workout, ...generatedWorkouts];
             setGeneratedWorkouts(updated);
             setUserProfile(p => ({ ...p, currentPlan: updated }));
-            setCurrentScreen('workout');
             setSelectedWorkoutId(workout.id);
+            setCurrentScreen('workout');
           }}
           isDarkMode={isDarkMode}
           themeColor={themeColor}

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft, Dumbbell, Flame, Activity, Zap, CheckCircle2, Target, ArrowRight } from 'lucide-react';
+import { ChevronLeft, Dumbbell, Flame, Activity, Zap, CheckCircle2, Target, ArrowRight, Sparkles } from 'lucide-react';
 
 interface GoalSelectionScreenProps {
   onFinish: (goal: string) => void;
@@ -12,13 +12,15 @@ interface Goal {
   desc: string;
   icon: React.ElementType;
   color: string;
+  isCustom?: boolean;
 }
 
 const goals: Goal[] = [
   { id: 'muscle', title: 'Ipertrofia', desc: 'Massimizza volume e forza muscolare.', icon: Dumbbell, color: 'emerald' },
-  { id: 'definition', title: 'Definizione', desc: 'Scolpisci i dettagli, mantieni i muscoli.', icon: Zap, color: 'emerald' }, // Changed color logic to match screenshot selection style
+  { id: 'definition', title: 'Definizione', desc: 'Scolpisci i dettagli, mantieni i muscoli.', icon: Zap, color: 'emerald' },
   { id: 'weight_loss', title: 'Perdita Peso', desc: 'Brucia calorie ad alta intensità.', icon: Flame, color: 'emerald' },
   { id: 'endurance', title: 'Resistenza', desc: 'Migliora fiato e stamina.', icon: Activity, color: 'emerald' },
+  { id: 'custom', title: 'Scheda Personalizzata', desc: 'Crea il tuo allenamento su misura.', icon: Sparkles, color: 'purple', isCustom: true },
 ];
 
 const GoalSelectionScreen: React.FC<GoalSelectionScreenProps> = ({ onFinish }) => {
@@ -41,6 +43,7 @@ const GoalSelectionScreen: React.FC<GoalSelectionScreenProps> = ({ onFinish }) =
         {goals.map((goal) => {
             const isSelected = selectedGoal === goal.id;
             const Icon = goal.icon;
+            const isPurple = goal.isCustom;
 
             return (
                 <div 
@@ -48,7 +51,9 @@ const GoalSelectionScreen: React.FC<GoalSelectionScreenProps> = ({ onFinish }) =
                     onClick={() => setSelectedGoal(goal.id)}
                     className={`p-6 rounded-3xl border transition-all cursor-pointer relative overflow-hidden group flex items-center justify-between ${
                         isSelected 
-                        ? 'bg-emerald-500 border-emerald-500 text-slate-950' 
+                        ? isPurple
+                          ? 'bg-purple-500 border-purple-500 text-slate-950'
+                          : 'bg-emerald-500 border-emerald-500 text-slate-950'
                         : 'bg-[#121212] border-slate-800 text-slate-400 hover:bg-[#1a1a1a]'
                     }`}
                 >
