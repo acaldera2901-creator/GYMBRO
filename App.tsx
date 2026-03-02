@@ -11,6 +11,7 @@ import PreferencesScreen from './screens/PreferencesScreen';
 import PlanGenerationScreen from './screens/PlanGenerationScreen';
 import CalendarScreen from './screens/CalendarScreen';
 import CommunityScreen from './screens/CommunityScreen';
+import CustomWorkoutBuilder from './screens/CustomWorkoutBuilder';
 import BottomNav from './components/BottomNav';
 import CoachMarks, { Step } from './components/CoachMarks';
 import BiometricGate from './components/BiometricGate';
@@ -519,11 +520,23 @@ const App: React.FC = () => {
           challenges={challenges}
           themeColor={themeColor}
       />;
+      case 'custom-workout-builder': return <CustomWorkoutBuilder
+          onBack={() => setCurrentScreen('home')}
+          onSave={(workout) => {
+            const updated = [workout, ...generatedWorkouts];
+            setGeneratedWorkouts(updated);
+            setUserProfile(p => ({ ...p, currentPlan: updated }));
+            setCurrentScreen('workout');
+            setSelectedWorkoutId(workout.id);
+          }}
+          isDarkMode={isDarkMode}
+          themeColor={themeColor}
+        />;
       default: return <LoginScreen onLogin={()=>{}} />;
     }
   };
 
-  const showBottomNav = ['calendar', 'community', 'profile'].includes(currentScreen);
+  const showBottomNav = ['home', 'calendar', 'community', 'profile', 'workout'].includes(currentScreen);
 
   return (
     <>

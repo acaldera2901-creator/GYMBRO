@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Home, Calendar, Dumbbell, User, Users } from 'lucide-react';
 import { ScreenName } from '../types';
@@ -11,56 +10,45 @@ interface BottomNavProps {
 }
 
 const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate, isDarkMode, themeColor }) => {
+  const isRose = themeColor === 'rose';
+  const accentHex = isRose ? '#f43f5e' : '#10b981';
+
   const navItems = [
-    { screen: 'home', icon: Home, id: 'nav-home' },
-    { screen: 'calendar', icon: Calendar, id: 'nav-calendar' },
-    { screen: 'community', icon: Users, isCenter: true, id: 'nav-community' },
-    { screen: 'workout', icon: Dumbbell, id: 'nav-workout' },
-    { screen: 'profile', icon: User, id: 'nav-profile' },
+    { screen: 'home' as ScreenName, icon: Home, id: 'nav-home', label: 'Home' },
+    { screen: 'calendar' as ScreenName, icon: Calendar, id: 'nav-calendar', label: 'Piano' },
+    { screen: 'workout' as ScreenName, icon: Dumbbell, id: 'nav-community', label: 'Allena', isCenter: true },
+    { screen: 'community' as ScreenName, icon: Users, id: 'nav-workout', label: 'Social' },
+    { screen: 'profile' as ScreenName, icon: User, id: 'nav-profile', label: 'Profilo' },
   ];
 
-  if (currentScreen === 'login') return null;
+  const HIDE_ON = ['login', 'profile-config', 'goal-selection', 'strength-test', 'preferences', 'plan-generation', 'custom-workout-builder'];
+  if (HIDE_ON.includes(currentScreen)) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none flex justify-center pb-safe px-4 mb-2">
-      <div className={`pointer-events-auto flex items-center justify-between px-6 py-4 rounded-[2rem] shadow-2xl backdrop-blur-xl border transition-all duration-300 w-full max-w-sm ${
-          isDarkMode 
-          ? 'bg-zinc-900/80 border-white/10' 
-          : 'bg-white/80 border-black/5'
-      }`}>
-        {navItems.map((item) => {
-          const isActive = currentScreen === item.screen;
-          const Icon = item.icon;
-          
-          if (item.isCenter) {
-             return (
-               <button
-                 key={item.screen}
-                 id={item.id}
-                 onClick={() => onNavigate(item.screen as ScreenName)}
-                 className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90 ${
-                     isDarkMode 
-                     ? `bg-${themeColor}-500 text-black` 
-                     : `bg-${themeColor}-500 text-white`
-                 } ${isActive ? 'ring-4 ring-offset-2 ring-offset-black ring-' + themeColor + '-500' : ''}`}
-               >
-                 <Icon size={26} strokeWidth={2.5} />
-               </button>
-             );
+    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none px-4 pb-3">
+      <div className="pointer-events-auto w-full max-w-sm bg-zinc-900/90 backdrop-blur-2xl border border-zinc-800/60 rounded-[2rem] px-5 py-3 flex items-center justify-between shadow-2xl shadow-black/40">
+        {navItems.map(({ screen, icon: Icon, id, label, isCenter }) => {
+          const isActive = currentScreen === screen;
+          if (isCenter) {
+            return (
+              <button key={screen} id={id} onClick={() => onNavigate(screen)}
+                className="relative w-14 h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-90 shadow-lg"
+                style={{
+                  backgroundColor: accentHex,
+                  boxShadow: `0 0 20px ${accentHex}50`
+                }}>
+                <Icon size={24} strokeWidth={2.5} className="text-black" />
+                {isActive && <div className="absolute -bottom-3 w-1 h-1 rounded-full bg-black/50" />}
+              </button>
+            );
           }
-
           return (
-            <button
-              key={item.screen}
-              id={item.id}
-              onClick={() => onNavigate(item.screen as ScreenName)}
-              className={`p-2 rounded-full transition-all duration-300 active:scale-90 ${
-                isActive 
-                ? `text-${themeColor}-500 bg-${themeColor}-500/10` 
-                : (isDarkMode ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-400 hover:text-zinc-600')
-              }`}
-            >
-              <Icon size={26} strokeWidth={isActive ? 2.5 : 2} />
+            <button key={screen} id={id} onClick={() => onNavigate(screen)}
+              className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all active:scale-90">
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8}
+                style={{ color: isActive ? accentHex : '#52525b' }} />
+              <span className="text-[8px] font-bold uppercase tracking-wider"
+                style={{ color: isActive ? accentHex : '#52525b' }}>{label}</span>
             </button>
           );
         })}

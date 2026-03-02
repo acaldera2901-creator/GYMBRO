@@ -1,6 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
-import { Flame, ArrowRight, Bell, BarChart2, Users, Dumbbell, CheckCircle2, User, X, Star, TrendingUp, Calendar as CalendarIcon, Swords, Bot } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Dumbbell, Bell, X, Star, ArrowUpRight, Play, Plus, Activity, Flame, Users, BarChart2, Calendar as CalendarIcon, ChevronRight } from 'lucide-react';
 import { ScreenName, UserProfile, UserStats, WorkoutCard, AppNotification } from '../types';
 
 interface HomeScreenProps {
@@ -15,260 +14,226 @@ interface HomeScreenProps {
   onMarkNotificationsRead?: () => void;
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ 
-    onNavigate, 
-    userProfile, 
-    userStats, 
-    availableWorkouts, 
-    onStartWorkout, 
-    isDarkMode, 
-    themeColor, 
-    notifications = [],
-    onMarkNotificationsRead 
+const HomeScreen: React.FC<HomeScreenProps> = ({
+  onNavigate, userProfile, userStats, availableWorkouts,
+  onStartWorkout, isDarkMode, themeColor, notifications = [], onMarkNotificationsRead
 }) => {
-  const firstName = userProfile.name ? userProfile.name.split(' ')[0] : 'GymBro';
+  const firstName = userProfile.name ? userProfile.name.split(' ')[0] : 'Atleta';
   const unreadCount = notifications.filter(n => !n.read).length;
+  const isRose = themeColor === 'rose';
+  const accentHex = isRose ? '#f43f5e' : '#10b981';
+  const accentBg = isRose ? 'bg-rose-500' : 'bg-emerald-500';
+  const accent = isRose ? 'text-rose-400' : 'text-emerald-400';
 
-  const theme = {
-      bg: isDarkMode ? 'bg-black' : 'bg-[#f2f2f7]',
-      text: isDarkMode ? 'text-white' : 'text-black',
-      textSub: isDarkMode ? 'text-zinc-400' : 'text-zinc-500',
-      card: isDarkMode ? 'bg-[#1c1c1e] border-white/5' : 'bg-white border-black/5 shadow-sm',
-      navBtn: isDarkMode ? 'bg-[#2c2c2e] text-zinc-300 border-transparent' : 'bg-white text-zinc-600 shadow-sm border-white',
-      orbitRing: isDarkMode ? 'border-white/10' : 'border-black/5',
-      profileBg: isDarkMode ? 'bg-[#1c1c1e] border-black' : 'bg-white border-white',
-  };
-
-  const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showAICoach, setShowAICoach] = useState(false);
+  const [workoutIdx, setWorkoutIdx] = useState(0);
 
   useEffect(() => {
     if (availableWorkouts.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentWorkoutIndex((prev) => (prev + 1) % availableWorkouts.length);
-    }, 4000); 
-    return () => clearInterval(interval);
+    const t = setInterval(() => setWorkoutIdx(p => (p + 1) % availableWorkouts.length), 5000);
+    return () => clearInterval(t);
   }, [availableWorkouts.length]);
 
-  const handleNotificationClick = (notif: AppNotification) => {
-      setShowNotifications(false);
-      if (notif.actionScreen) {
-          if (notif.type === 'workout' && notif.dataId) {
-             onStartWorkout(notif.dataId);
-          } else {
-             onNavigate(notif.actionScreen);
-          }
-      }
+  const todayWorkout = availableWorkouts.length > 0 ? availableWorkouts[workoutIdx] : null;
+
+  const todayLabel = useMemo(() => {
+    return new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  }, []);
+
+  const isTrainingDay = useMemo(() => {
+    const dow = new Date().getDay();
+    const appDay = dow === 0 ? 6 : dow - 1;
+    return (userProfile.trainingDays || []).includes(appDay);
+  }, [userProfile.trainingDays]);
+
+  const handleToggleNotif = () => {
+    if (!showNotifications && onMarkNotificationsRead) onMarkNotificationsRead();
+    setShowNotifications(v => !v);
   };
 
-  const handleToggleNotifications = () => {
-      if (!showNotifications && onMarkNotificationsRead) {
-          onMarkNotificationsRead();
-      }
-      setShowNotifications(!showNotifications);
-  };
-
-  const currentSelection = availableWorkouts.length > 0 ? availableWorkouts[currentWorkoutIndex] : null;
+  const QUICK_ACTIONS = [
+    { label: 'Calendario', icon: CalendarIcon, screen: 'calendar' as ScreenName, color: '#6366f1' },
+    { label: 'Community', icon: Users, screen: 'community' as ScreenName, color: '#f59e0b' },
+    { label: 'Statistiche', icon: BarChart2, screen: 'profile' as ScreenName, color: '#06b6d4' },
+    { label: 'Crea Scheda', icon: Plus, screen: 'custom-workout-builder' as ScreenName, color: accentHex },
+  ];
 
   return (
-    <div className={`min-h-screen ${theme.bg} pb-safe relative overflow-x-hidden transition-colors duration-500`}>
-      
-      {/* Subtle Gradient Spotlights */}
-      <div className={`absolute top-[-20%] left-[-20%] w-[80%] h-[50%] bg-${themeColor}-500/20 blur-[120px] pointer-events-none rounded-full`}></div>
-      <div className={`absolute top-[20%] right-[-20%] w-[60%] h-[40%] bg-blue-500/10 blur-[100px] pointer-events-none rounded-full`}></div>
-
-      {/* Header */}
-      <div className="px-6 pt-14 pb-4 flex justify-between items-center relative z-10" id="header-stats">
-        <div>
-          <h1 className={`text-4xl font-extrabold ${theme.text} tracking-tight leading-none`}>
-            Ciao, <span className={`text-${themeColor}-500`}>{firstName}</span>
-          </h1>
-          <p className={`text-sm font-medium ${theme.textSub} mt-1`}>
-              Pronto a superare i tuoi limiti?
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-            <button 
-              id="btn-notifications"
-              onClick={handleToggleNotifications}
-              className={`w-10 h-10 rounded-full flex items-center justify-center relative transition-transform active:scale-95 ${isDarkMode ? 'bg-[#2c2c2e]' : 'bg-white shadow-sm'}`}
-            >
-              {showNotifications ? <X size={20} className={theme.textSub} /> : <Bell size={20} className={theme.textSub} />}
-              {unreadCount > 0 && !showNotifications && (
-                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-[2px] border-black flex items-center justify-center">
-                    <span className="text-[9px] font-bold text-white">{unreadCount}</span>
-                 </div>
-              )}
-            </button>
-        </div>
+    <div className="min-h-screen bg-[#080808] pb-28 overflow-x-hidden">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full opacity-20 blur-[100px]" style={{ backgroundColor: accentHex }} />
+        <div className="absolute top-1/3 -right-20 w-64 h-64 rounded-full opacity-10 blur-[80px] bg-blue-500" />
       </div>
 
-      {/* AI COACH MODAL */}
-      {showAICoach && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-6" onClick={() => setShowAICoach(false)}>
-              <div className={`absolute inset-0 ${isDarkMode ? 'bg-black/60' : 'bg-white/60'} backdrop-blur-md animate-in fade-in duration-300`}></div>
-              <div className="relative z-10 max-w-xs w-full bg-[#1c1c1e] border border-white/10 rounded-[2rem] p-8 text-center shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setShowAICoach(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X size={20} /></button>
-                  
-                  <div className={`w-20 h-20 mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20`}>
-                      <Bot size={40} className="text-white" />
-                  </div>
-                  
-                  <h2 className="text-2xl font-black text-white mb-2 italic tracking-tight">
-                      AI Coach
-                  </h2>
-                  <div className="inline-block px-3 py-1 rounded-full bg-white/10 border border-white/10 text-[10px] font-bold text-white mb-4 uppercase tracking-widest">
-                      Coming Soon
-                  </div>
-                  
-                  <p className="text-zinc-400 text-sm font-medium leading-relaxed">
-                      Il tuo personal trainer intelligente è in fase di addestramento. Presto potrà correggere la tua forma e ottimizzare i tuoi piani in tempo reale.
-                  </p>
+      {/* HEADER */}
+      <div className="relative px-5 pt-14 pb-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-zinc-600 text-xs font-medium capitalize">{todayLabel}</p>
+            <h1 className="text-3xl font-black text-white mt-0.5">
+              Ciao, <span style={{ color: accentHex }}>{firstName}</span>
+            </h1>
+            {isTrainingDay ? (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentHex }} />
+                <span className="text-xs font-bold" style={{ color: accentHex }}>Giorno di allenamento</span>
               </div>
-          </div>
-      )}
-
-      {/* NOTIFICATION SHEET */}
-      {showNotifications && (
-          <div className="absolute top-28 left-4 right-4 z-50 animate-scale-in origin-top-right">
-              <div className={`${theme.card} rounded-3xl p-5 border shadow-2xl backdrop-blur-xl bg-opacity-95`}>
-                  <h3 className={`font-bold ${theme.text} mb-4 ml-1 text-lg`}>Centro Notifiche</h3>
-                  {notifications.length === 0 ? (
-                      <p className={`text-sm ${theme.textSub} py-4 text-center`}>Tutto tranquillo per ora.</p>
-                  ) : (
-                      <div className="space-y-3 max-h-[50vh] overflow-y-auto">
-                          {notifications.map(notif => (
-                              <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-4 p-3 rounded-2xl transition-colors cursor-pointer active:scale-98 ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${notif.type === 'badge_unlock' ? 'bg-yellow-500' : `bg-${themeColor}-500`}`}>
-                                      {notif.type === 'workout' ? <Dumbbell size={18} className="text-white"/> : notif.type === 'badge_unlock' ? <Star size={18} className="text-white"/> : <Swords size={18} className="text-white"/>}
-                                  </div>
-                                  <div>
-                                      <p className={`font-bold text-sm ${theme.text}`}>{notif.title}</p>
-                                      <p className={`text-xs ${theme.textSub} mt-0.5 leading-snug`}>{notif.message}</p>
-                                  </div>
-                              </div>
-                          ))}
-                      </div>
-                  )}
-              </div>
-          </div>
-      )}
-
-      {/* ORBIT NAVIGATION */}
-      <div className="relative h-[300px] w-full flex justify-center items-center my-4">
-        <div className={`absolute w-[280px] h-[280px] rounded-full border ${theme.orbitRing} opacity-50`}></div>
-        <div className={`absolute w-[190px] h-[190px] rounded-full border ${theme.orbitRing} opacity-80`}></div>
-        
-        <div 
-            id="orbit-profile"
-            onClick={() => onNavigate('profile')}
-            className={`w-28 h-28 rounded-full p-1.5 cursor-pointer relative z-20 transition-transform active:scale-95 shadow-2xl ${theme.profileBg}`}
-        >
-            <div className="w-full h-full rounded-full overflow-hidden relative">
-                {userProfile.image ? (
-                    <img src={userProfile.image} className="w-full h-full object-cover" />
-                ) : (
-                    <div className={`w-full h-full flex items-center justify-center ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-100'}`}><User size={40} className={theme.textSub}/></div>
-                )}
-            </div>
-            {userStats.workoutsCompleted > 0 && (
-                <div className={`absolute bottom-0 right-0 w-8 h-8 rounded-full border-[4px] ${isDarkMode ? 'border-black' : 'border-[#f2f2f7]'} bg-${themeColor}-500 flex items-center justify-center text-black`}>
-                    <CheckCircle2 size={16} strokeWidth={3} />
-                </div>
+            ) : (
+              <p className="text-zinc-600 text-xs mt-1">Giorno di riposo 💤</p>
             )}
+          </div>
+          <button onClick={handleToggleNotif} className="relative w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center active:scale-90 transition-transform">
+            {showNotifications ? <X size={18} className="text-zinc-400" /> : <Bell size={18} className="text-zinc-400" />}
+            {unreadCount > 0 && !showNotifications && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-[#080808] flex items-center justify-center">
+                <span className="text-[8px] font-black text-white">{unreadCount}</span>
+              </div>
+            )}
+          </button>
         </div>
 
-        {/* ORBIT ICONS */}
-        <button onClick={() => onNavigate('calendar')} className={`absolute top-4 w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-1 backdrop-blur-md shadow-lg transition-transform active:scale-90 ${theme.navBtn}`}>
-            <CalendarIcon size={18} className={`text-${themeColor}-500`} />
-        </button>
-
-        {/* AI Coach Button - Placed at Top Right Satellite Position */}
-        <button 
-            onClick={() => setShowAICoach(true)}
-            className={`absolute top-12 right-20 w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-1 backdrop-blur-md shadow-lg transition-transform active:scale-90 ${theme.navBtn}`}
-        >
-            <Bot size={18} className={`text-${themeColor}-500`} />
-        </button>
-
-        <button onClick={() => onNavigate('profile')} className={`absolute left-8 w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-1 backdrop-blur-md shadow-lg transition-transform active:scale-90 ${theme.navBtn}`}>
-            <BarChart2 size={18} className={`text-${themeColor}-500`} />
-        </button>
-
-        <button onClick={() => onNavigate('community')} className={`absolute right-8 w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-1 backdrop-blur-md shadow-lg transition-transform active:scale-90 ${theme.navBtn}`}>
-            <Users size={18} className={`text-${themeColor}-500`} />
-        </button>
-
-        <div className="absolute bottom-0 z-30" id="action-workout-main">
-            <button 
-                onClick={() => onNavigate('workout')}
-                className={`flex items-center gap-2 px-8 py-3.5 rounded-full bg-${themeColor}-500 text-slate-950 font-black text-base shadow-[0_0_30px_-5px_rgba(var(--theme-color),0.6)] transition-all hover:scale-105 active:scale-95 border-2 border-transparent hover:border-white/20`}
-                style={{
-                    boxShadow: `0 0 30px -5px ${themeColor === 'rose' ? 'rgba(244, 63, 94, 0.6)' : 'rgba(16, 185, 129, 0.6)'}`
-                }}
-            >
-                <Dumbbell size={20} fill="currentColor" />
-                <span>ALLENATI</span>
-            </button>
-        </div>
-      </div>
-
-      {/* WIDGETS SECTION */}
-      <div className="px-6 space-y-4">
-        
-        {/* Next Workout Card */}
-        <div 
-            id="card-next-workout"
-            onClick={() => currentSelection && onStartWorkout(currentSelection.id)}
-            className={`w-full rounded-3xl p-6 border relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all duration-300 ${theme.card}`}
-        >
-            <div className="flex justify-between items-start relative z-10">
-                <div>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider ${theme.textSub} flex items-center gap-1.5 mb-1`}>
-                        <span className={`w-1.5 h-1.5 rounded-full bg-${themeColor}-500`}></span>
-                        Consigliato per oggi
-                    </span>
-                    <h2 className={`text-2xl font-bold ${theme.text} leading-tight max-w-[200px]`}>
-                        {currentSelection ? currentSelection.title : 'Genera Scheda'}
-                    </h2>
-                    {currentSelection && <p className={`text-xs font-medium ${theme.textSub} mt-1`}>{currentSelection.category} • {currentSelection.exercises.length} Esercizi</p>}
-                </div>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isDarkMode ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'}`}>
-                    <ArrowRight size={24} />
-                </div>
-            </div>
-            
-            <div className={`absolute -bottom-10 -right-10 w-40 h-40 bg-${themeColor}-500/20 blur-[50px] rounded-full pointer-events-none`}></div>
-        </div>
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 gap-4">
-            <div className={`p-5 rounded-3xl border flex flex-col justify-between aspect-square ${theme.card}`} id="widget-streak">
-                <div className="flex justify-between items-start">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-orange-500/10 text-orange-500`}>
-                        <Flame size={20} fill="currentColor" />
+        {showNotifications && (
+          <div className="absolute top-full left-4 right-4 z-50 mt-2 animate-in slide-in-from-top-2 duration-200">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-2xl">
+              <p className="font-bold text-white text-sm mb-3">Notifiche</p>
+              {notifications.length === 0 ? (
+                <p className="text-zinc-600 text-sm text-center py-3">Nessuna notifica</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {notifications.map(n => (
+                    <div key={n.id} className="flex gap-3 p-2 rounded-xl hover:bg-zinc-800 cursor-pointer transition-colors">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${accentBg}`}>
+                        {n.type === 'badge_unlock' ? <Star size={14} className="text-black" /> : <Dumbbell size={14} className="text-black" />}
+                      </div>
+                      <div><p className="text-white text-xs font-bold">{n.title}</p><p className="text-zinc-500 text-xs">{n.message}</p></div>
                     </div>
+                  ))}
                 </div>
-                <div>
-                    <span className={`text-3xl font-bold ${theme.text} block`}>{userStats.streak}</span>
-                    <span className={`text-xs font-medium ${theme.textSub}`}>Day Streak</span>
-                </div>
+              )}
             </div>
-
-            <div className={`p-5 rounded-3xl border flex flex-col justify-between aspect-square ${theme.card}`}>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-purple-500/10 text-purple-500`}>
-                    <TrendingUp size={20} />
-                </div>
-                <div>
-                    <span className={`text-3xl font-bold ${theme.text} block`}>{userStats.workoutsCompleted}</span>
-                    <span className={`text-xs font-medium ${theme.textSub}`}>Workouts</span>
-                </div>
-            </div>
-        </div>
-
+          </div>
+        )}
       </div>
+
+      {/* STATS */}
+      <div className="px-5 mb-5">
+        <div className="grid grid-cols-3 gap-2.5">
+          {[
+            { icon: <Flame size={14} fill="currentColor" className="text-orange-400" />, val: userStats.streak, lbl: 'Streak', bg: '#f9731610' },
+            { icon: <Dumbbell size={14} className={accent} />, val: userStats.workoutsCompleted, lbl: 'Workout', bg: `${accentHex}10` },
+            { icon: <Activity size={14} className="text-sky-400" />, val: `${Math.floor(userStats.activeMinutes / 60)}h`, lbl: 'Attivo', bg: '#0ea5e910' },
+          ].map(({ icon, val, lbl, bg }) => (
+            <div key={lbl} className="bg-zinc-900/70 rounded-2xl border border-zinc-800/50 p-3.5 flex flex-col items-center gap-1.5">
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ backgroundColor: bg }}>{icon}</div>
+              <span className="text-lg font-black text-white leading-none">{val}</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-600">{lbl}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* TODAY WORKOUT CARD */}
+      <div className="px-5 mb-5">
+        <div className="relative overflow-hidden rounded-3xl border border-zinc-800/50" style={{ background: `linear-gradient(135deg, #111 0%, ${accentHex}12 100%)` }}>
+          <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full opacity-30 blur-2xl" style={{ backgroundColor: accentHex }} />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentHex }} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Consigliato Oggi</span>
+                </div>
+                <h2 className="text-xl font-black text-white leading-tight">
+                  {todayWorkout ? todayWorkout.title : 'Scegli allenamento'}
+                </h2>
+                {todayWorkout && <p className="text-zinc-500 text-xs mt-1">{todayWorkout.category} · {todayWorkout.exercises.length} esercizi</p>}
+              </div>
+              <button id="action-workout-main"
+                onClick={() => todayWorkout ? onStartWorkout(todayWorkout.id) : onNavigate('workout')}
+                className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 active:scale-90 transition-transform shadow-lg" style={{ backgroundColor: accentHex }}>
+                <Play size={20} fill="black" className="text-black ml-0.5" />
+              </button>
+            </div>
+            {todayWorkout && (
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                {todayWorkout.exercises.slice(0, 4).map((ex, i) => (
+                  <div key={i} className="shrink-0 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                    <p className="text-white text-[10px] font-medium whitespace-nowrap">{ex.name}</p>
+                  </div>
+                ))}
+                {todayWorkout.exercises.length > 4 && (
+                  <div className="shrink-0 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                    <p className="text-zinc-500 text-[10px] font-medium">+{todayWorkout.exercises.length - 4}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div className="px-5 mb-5">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 mb-3">Azioni Rapide</p>
+        <div className="grid grid-cols-4 gap-2.5">
+          {QUICK_ACTIONS.map(({ label, icon: Icon, screen, color }) => (
+            <button key={screen} onClick={() => onNavigate(screen)}
+              className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-zinc-900/70 border border-zinc-800/50 active:scale-90 transition-transform">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}18` }}>
+                <Icon size={16} style={{ color }} />
+              </div>
+              <span className="text-[9px] font-bold text-zinc-500 text-center leading-tight">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* WORKOUT LIBRARY */}
+      <div className="px-5 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">Libreria Schede</p>
+          <button onClick={() => onNavigate('workout')} className="flex items-center gap-1 text-[10px] font-bold" style={{ color: accentHex }}>
+            Vedi tutto <ArrowUpRight size={10} />
+          </button>
+        </div>
+        <div className="space-y-2">
+          {availableWorkouts.slice(0, 3).map(w => (
+            <div key={w.id} onClick={() => onStartWorkout(w.id)}
+              className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-zinc-900/70 border border-zinc-800/50 cursor-pointer active:scale-[0.98] transition-transform">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${accentHex}15` }}>
+                <Dumbbell size={16} style={{ color: accentHex }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm truncate">{w.title}</p>
+                <p className="text-zinc-600 text-xs mt-0.5">{w.category} · {w.exercises.length} esercizi</p>
+              </div>
+              {w.isCustom && <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-md text-purple-400 bg-purple-500/10 border border-purple-500/20 shrink-0">Custom</span>}
+              <ChevronRight size={14} className="text-zinc-700 shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* MASSIMALI */}
+      {(userStats.maxes?.bench || userStats.maxes?.squat || userStats.maxes?.deadlift) ? (
+        <div className="px-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">Massimali 1RM</p>
+            <button onClick={() => onNavigate('profile')} className="flex items-center gap-1 text-[10px] font-bold" style={{ color: accentHex }}>
+              Modifica <ArrowUpRight size={10} />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
+            {[{lbl:'Panca',em:'🏋️',val:userStats.maxes?.bench},{lbl:'Squat',em:'🦵',val:userStats.maxes?.squat},{lbl:'Stacco',em:'⚡',val:userStats.maxes?.deadlift}].map(({lbl,em,val})=>(
+              <div key={lbl} className="bg-zinc-900/70 rounded-2xl border border-zinc-800/50 p-3 text-center">
+                <span className="text-lg">{em}</span>
+                <p className="text-white font-black text-base mt-1">{val||0}<span className="text-zinc-600 text-[9px] ml-0.5">kg</span></p>
+                <p className="text-[9px] text-zinc-600 font-bold uppercase">{lbl}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
