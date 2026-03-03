@@ -327,7 +327,7 @@ const App: React.FC = () => {
           const historyItem = userStats.workoutHistory.find(h => String(h.id).includes(targetIdClean));
           if (historyItem) realId = historyItem.id;
 
-          if (sessionUserId) await revertWorkoutTransaction(sessionUserId, realId, workoutId);
+          if (sessionUserId) await revertWorkoutTransaction(sessionUserId, realId);
 
           const updatedHistory = userStats.workoutHistory.filter(h => !String(h.id).includes(targetIdClean));
           setUserStats(prev => ({...prev, workoutsCompleted: Math.max(0, prev.workoutsCompleted - 1), streak: recalculateStreak(updatedHistory), workoutHistory: updatedHistory}));
@@ -352,14 +352,49 @@ const App: React.FC = () => {
   const handleWorkoutComplete = useCallback(async (duration: number, exCount: number, img: string | null, w: WorkoutCard, nextScreen: ScreenName = 'home') => {
       setIsLoading(true);
       try {
-          const updatedBadges = userStats.badges; 
-          if (sessionUserId) await completeWorkoutTransaction(sessionUserId, w, duration, updatedBadges);
+          // Stima kg sollevati dal workout
+          let estimatedKg = 0;
+          w.exercises.forEach(ex => {
+              const repsStr = ex.reps ?? '';
+              const setsMatch = repsStr.match(/^(\d+)\s*[x\u00d7X]/i);
+              const repsMatch = repsStr.match(/[x\u00d7X]\s*(\d+)/i);
+              const weightMatch = repsStr.match(/@\s*(\d+)/i) || repsStr.match(/(\d+)\s*kg/i);
+              const sets = setsMatch ? parseInt(setsMatch[1]) : 3;
+              const reps = repsMatch ? parseInt(repsMatch[1]) : 10;
+              const weight = weightMatch ? parseInt(weightMatch[1]) : 0;
+              estimatedKg += sets * reps * weight;
+          });
 
           const finalId = `done_${Date.now()}_${w.id}`;
           const newHistoryEntry = { id: finalId, date: new Date().toISOString().split('T')[0], workoutTitle: w.title, duration: duration, category: w.category };
           const updatedHistory = [newHistoryEntry, ...userStats.workoutHistory];
-          
-          setUserStats(prev => ({ ...prev, workoutsCompleted: prev.workoutsCompleted + 1, streak: recalculateStreak(updatedHistory), activeMinutes: prev.activeMinutes + Math.floor(duration/60), workoutHistory: updatedHistory }));
+
+          // Valuta badge con stats aggiornate
+          const preEvalStats: UserStats = {
+              ...userStats,
+              workoutsCompleted: userStats.workoutsCompleted + 1,
+              streak: recalculateStreak(updatedHistory),
+              workoutHistory: updatedHistory
+          };
+          const { updatedBadges, newUnlocks } = evaluateBadges(preEvalStats.badges, preEvalStats);
+
+          if (sessionUserId) await completeWorkoutTransaction(sessionUserId, w, duration, updatedBadges);
+
+          setUserStats(prev => ({
+              ...prev,
+              workoutsCompleted: prev.workoutsCompleted + 1,
+              kgLifted: prev.kgLifted + estimatedKg,
+              streak: recalculateStreak(updatedHistory),
+              activeMinutes: prev.activeMinutes + Math.floor(duration / 60),
+              workoutHistory: updatedHistory,
+              badges: updatedBadges
+          }));
+
+          // Mostra notifica badge sbloccato
+          if (newUnlocks.length > 0) {
+              setShowBadgeUnlock(newUnlocks[0]);
+              setTimeout(() => setShowBadgeUnlock(null), 4000);
+          }
 
           // Update Schedule State
           const dateKey = new Date().toISOString().split('T')[0];
@@ -405,7 +440,6 @@ const App: React.FC = () => {
           setupProfileRef.current = { ...setupProfileRef.current, goal: g };
           setUserProfile(p=>({...p, goal: g}));
           if (g === 'custom') {
-            // Personalizzato: va comunque al test massimali, salta solo la generazione piano
             setupProfileRef.current = { ...setupProfileRef.current, currentPlan: [] };
           }
           setCurrentScreen('strength-test');
@@ -433,12 +467,7 @@ const App: React.FC = () => {
                   }
               }));
           }
-          // Se obiettivo personalizzato, salta la generazione piano → vai a preferenze
-          if (setupProfileRef.current?.goal === 'custom') {
-              setCurrentScreen('preferences');
-          } else {
-              setCurrentScreen('plan-generation');
-          }
+          setCurrentScreen(setupProfileRef.current?.goal === 'custom' ? 'preferences' : 'plan-generation');
       }} />;
       case 'plan-generation': return <PlanGenerationScreen userProfile={{...userProfile, knownMaxes: (setupProfileRef.current as any)?.knownMaxes || null}} onPlanGenerated={(w, calculatedMaxes) => {
           setupProfileRef.current = { ...setupProfileRef.current, currentPlan: w, maxes: calculatedMaxes };
@@ -453,8 +482,8 @@ const App: React.FC = () => {
       case 'preferences': return <PreferencesScreen
           userId={sessionUserId || undefined}
           accumulatedProfile={setupProfileRef.current}
-          onNext={(f, days) => {
-              setUserProfile(p=>({...p, favoriteExercises: f, trainingDays: days}));
+          onNext={(f, days, setupImage) => {
+              setUserProfile(p=>({...p, favoriteExercises: f, trainingDays: days, image: setupImage || p.image}));
               generateFutureSchedule(generatedWorkouts, days, {});
               const isCustomGoal = setupProfileRef.current?.goal === 'custom';
               setupProfileRef.current = {};
@@ -535,13 +564,9 @@ const App: React.FC = () => {
             const updated = [workout, ...generatedWorkouts];
             setGeneratedWorkouts(updated);
             setUserProfile(p => ({ ...p, currentPlan: updated }));
-            
-            // Rigenera il calendario con i nuovi workout + giorni dell'utente
             if (userProfile.trainingDays && userProfile.trainingDays.length > 0) {
               generateFutureSchedule(updated, userProfile.trainingDays, workoutSchedule);
             }
-            
-            // Vai alla libreria (non al dettaglio) così l'utente vede tutte le schede
             setSelectedWorkoutId(null);
             setCurrentScreen('workout');
           }}
@@ -559,6 +584,20 @@ const App: React.FC = () => {
       {renderScreen()}
       {showCoachMarks && <CoachMarks steps={TUTORIAL_STEPS} onComplete={()=>{setShowCoachMarks(false); localStorage.setItem('hasSeenCoachMarks','true');}} themeColor={themeColor} />}
       {currentScreen!=='login' && showBottomNav && <BottomNav currentScreen={currentScreen} onNavigate={setCurrentScreen} isDarkMode={isDarkMode} themeColor={themeColor} />}
+      {showBadgeUnlock && (
+        <div className="fixed top-16 left-4 right-4 z-[200] animate-in slide-in-from-top-4 fade-in duration-500">
+          <div className="bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border border-yellow-500/30 backdrop-blur-xl rounded-2xl p-4 flex items-center gap-3 shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
+              <Medal size={24} className="text-yellow-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-yellow-400 text-[10px] font-bold uppercase tracking-widest">Badge Sbloccato!</p>
+              <p className="text-white font-bold text-sm truncate">{showBadgeUnlock.title} - {showBadgeUnlock.tier}</p>
+            </div>
+            <button onClick={() => setShowBadgeUnlock(null)} className="text-zinc-500 hover:text-white p-1"><span className="text-lg">&times;</span></button>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -258,9 +258,9 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
                   </div>
                   
                   <div className="px-6 py-3 flex gap-2 overflow-x-auto scrollbar-hide">
-                      {(['All', 'Massa', 'Definizione', 'Perdita Peso', 'Resistenza'] as const).map(cat => (
+                      {(['All', 'Massa', 'Definizione', 'Perdita Peso', 'Resistenza', 'Custom'] as const).map(cat => (
                           <button key={cat} onClick={() => setSelectedCategoryFilter(cat)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors whitespace-nowrap ${selectedCategoryFilter === cat ? `${theme.accentBg} text-slate-950 border-transparent` : (isDarkMode ? 'border-zinc-700 text-zinc-400' : 'border-slate-200 text-slate-500')}`}>
-                              {cat === 'All' ? 'Tutti' : cat}
+                              {cat === 'All' ? 'Tutti' : cat === 'Custom' ? 'Le Mie' : cat}
                           </button>
                       ))}
                   </div>
