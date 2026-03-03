@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Dumbbell, Flame, Activity, Zap, Timer, ChevronLeft, Play, CheckCircle2, Clock, X, Trophy, StopCircle, Camera, ChevronRight, LayoutDashboard, Minus, Pause, Swords, Trash2, Save, SkipForward, FastForward, Calendar, History } from 'lucide-react';
+import { Plus, Dumbbell, Flame, Activity, Zap, Timer, ChevronLeft, Play, CheckCircle2, Clock, X, Trophy, StopCircle, Camera, ChevronRight, LayoutDashboard, Minus, Pause, Swords, Trash2, Save, SkipForward, FastForward, Calendar, History, Sparkles } from 'lucide-react';
 import { CategoryType, WorkoutCard, Post, UserProfile, ScreenName } from '../types';
 
 interface WorkoutDetailScreenProps {
@@ -301,7 +301,8 @@ const CATEGORY_INFO: Record<CategoryType, { color: string, icon: React.ElementTy
     'Massa': { color: 'emerald', icon: Dumbbell, desc: '3 giri • Recupero 90"', sub: 'Muscle Gain', imageMen: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=2070&auto=format&fit=crop', imageWomen: 'https://images.unsplash.com/photo-1522898467493-49726bf28798?q=80&w=2070&auto=format&fit=crop', restSeconds: 90 },
     'Definizione': { color: 'violet', icon: Zap, desc: '4 giri • Recupero 45"', sub: 'Shredded & Toned', imageMen: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=2070&auto=format&fit=crop', imageWomen: 'https://images.unsplash.com/photo-1609643002902-1063f5de5b21?q=80&w=2070&auto=format&fit=crop', restSeconds: 45 },
     'Perdita Peso': { color: 'orange', icon: Flame, desc: 'AMRAP • Rec. Attivo', sub: 'Fat Burn', imageMen: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=2070&auto=format&fit=crop', imageWomen: 'https://images.unsplash.com/photo-1574680096141-9877b4544b7d?q=80&w=2070&auto=format&fit=crop', restSeconds: 30 },
-    'Resistenza': { color: 'blue', icon: Activity, desc: 'Recupero 60"', sub: 'Endurance', imageMen: 'https://images.unsplash.com/photo-1517963879466-e825c6329090?q=80&w=2070&auto=format&fit=crop', imageWomen: 'https://images.unsplash.com/photo-1538805060504-630c9368c375?q=80&w=2070&auto=format&fit=crop', restSeconds: 60 }
+    'Resistenza': { color: 'blue', icon: Activity, desc: 'Recupero 60"', sub: 'Endurance', imageMen: 'https://images.unsplash.com/photo-1517963879466-e825c6329090?q=80&w=2070&auto=format&fit=crop', imageWomen: 'https://images.unsplash.com/photo-1538805060504-630c9368c375?q=80&w=2070&auto=format&fit=crop', restSeconds: 60 },
+    'Custom': { color: 'purple', icon: Sparkles, desc: 'Le Tue Schede', sub: 'Personalizzato', imageMen: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070&auto=format&fit=crop', imageWomen: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=2070&auto=format&fit=crop', restSeconds: 60 }
 };
 
 const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ 
@@ -361,10 +362,14 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
     }
   }, [initialWorkoutId, activeDatabase, hasWorkouts]);
 
-  const { displayWorkouts } = useMemo(() => {
-      const filtered = activeDatabase.filter(w => w.category === selectedCategory);
+  const { displayWorkouts, customWorkoutsList } = useMemo(() => {
+      const custom = activeDatabase.filter(w => w.isCustom || w.category === 'Custom');
+      const filtered = selectedCategory === 'Custom' 
+          ? custom
+          : activeDatabase.filter(w => w.category === selectedCategory);
       return { 
-          displayWorkouts: filtered.length > 0 ? filtered : activeDatabase
+          displayWorkouts: filtered.length > 0 ? filtered : activeDatabase.filter(w => !w.isCustom && w.category !== 'Custom'),
+          customWorkoutsList: custom
       };
   }, [activeDatabase, selectedCategory]);
 
@@ -635,7 +640,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
             </div>
 
             <div className="flex gap-3 overflow-x-auto px-6 pb-6 scrollbar-hide">
-                {(Object.keys(CATEGORY_INFO) as CategoryType[]).map(cat => (
+                {(Object.keys(CATEGORY_INFO) as CategoryType[]).filter(cat => cat !== 'Custom' || customWorkoutsList.length > 0).map(cat => (
                     <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-6 py-3 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-white text-black shadow-lg' : 'bg-zinc-800 text-zinc-400'}`}>
                         {cat}
                     </button>
@@ -643,6 +648,40 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
             </div>
 
             <div className="px-6 space-y-4">
+                {/* ── LE MIE SCHEDE (Custom Workouts) ── */}
+                {customWorkoutsList.length > 0 && selectedCategory !== 'Custom' && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-purple-400" />
+                        <h3 className={`text-lg font-bold ${theme.text}`}>Le Mie Schede</h3>
+                      </div>
+                      <button onClick={() => setSelectedCategory('Custom')} className="text-purple-400 text-xs font-bold">
+                        Vedi tutte
+                      </button>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                      {customWorkoutsList.slice(0, 5).map((w) => (
+                        <div key={w.id} onClick={() => setActiveWorkout(w)} 
+                          className={`shrink-0 w-44 p-4 rounded-2xl cursor-pointer active:scale-95 transition-transform border ${isDarkMode ? 'bg-purple-500/5 border-purple-500/20' : 'bg-purple-50 border-purple-200'}`}>
+                          <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mb-3">
+                            <Sparkles size={18} className="text-purple-400" />
+                          </div>
+                          <h4 className={`font-bold text-sm ${theme.text} truncate`}>{w.title}</h4>
+                          <p className={`text-[10px] ${theme.textSub} mt-1`}>{w.exercises.length} Esercizi</p>
+                        </div>
+                      ))}
+                      {onCreateWorkout && (
+                        <div onClick={onCreateWorkout} 
+                          className={`shrink-0 w-44 p-4 rounded-2xl cursor-pointer active:scale-95 transition-transform border-2 border-dashed flex flex-col items-center justify-center ${isDarkMode ? 'border-zinc-800 text-zinc-600' : 'border-zinc-300 text-zinc-400'}`}>
+                          <Plus size={24} className="mb-2" />
+                          <span className="text-xs font-bold">Crea Nuova</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <h3 className={`text-xl font-bold ${theme.text}`}>Tutti i piani</h3>
                   {onCreateWorkout && (
@@ -670,6 +709,11 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                     <div className="text-center py-10 opacity-50">
                         <Dumbbell size={32} className="mx-auto mb-2 text-zinc-500" />
                         <p className={`text-sm ${theme.textSub}`}>Nessun piano disponibile.</p>
+                        {selectedCategory === 'Custom' && onCreateWorkout && (
+                          <button onClick={onCreateWorkout} className="mt-4 px-6 py-3 bg-purple-500/20 border border-purple-500/30 rounded-2xl text-purple-400 text-sm font-bold active:scale-95 transition-transform">
+                            <Plus size={14} className="inline mr-1" /> Crea la tua prima scheda
+                          </button>
+                        )}
                     </div>
                 )}
             </div>

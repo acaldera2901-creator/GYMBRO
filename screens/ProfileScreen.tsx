@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { UserProfile, UserStats, WorkoutCard, Badge } from '../types';
-import { SecureStorageManager } from '../lib/secureStorage';
 import { updateProfileField, updateUserStats } from '../lib/supabase';
 
 interface ProfileScreenProps {
@@ -235,13 +234,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [showEdit, setShowEdit] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const [notifSettings, setNotifSettings] = useState({ daily: true, sound: true, vibration: true });
-  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState<'stats' | 'badges' | 'history'>('stats');
   const [localImage, setLocalImage] = useState<string | undefined>(userProfile.image);
   const [imageKey, setImageKey] = useState(0);
 
   useEffect(() => { setLocalImage(userProfile.image); setImageKey(k => k + 1); }, [userProfile.image]);
-  useEffect(() => { setBiometricsEnabled(SecureStorageManager.isBiometricsEnabled()); }, []);
 
   const isRose = themeColor === 'rose';
   const accentHex = isRose ? '#f43f5e' : '#10b981';
@@ -486,12 +483,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <div className="pb-6">
           <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 mb-3 pl-1">Impostazioni</p>
           <div className="bg-zinc-900/70 rounded-2xl overflow-hidden border border-zinc-800/50 divide-y divide-zinc-800/40">
-            <div className="flex items-center justify-between p-4">
-              <div><p className="font-medium text-white text-sm">FaceID</p><p className="text-xs text-zinc-600">Sicurezza account</p></div>
-              <button onClick={()=>{const v=!biometricsEnabled;setBiometricsEnabled(v);SecureStorageManager.setBiometricsEnabled(v);}} className={`w-11 h-6 rounded-full relative transition-colors duration-300 ${biometricsEnabled?accentBg:'bg-zinc-700'}`}>
-                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 ${biometricsEnabled?'left-[22px]':'left-0.5'}`}/>
-              </button>
-            </div>
             <div onClick={()=>setShowNotif(true)} className="flex items-center justify-between p-4 cursor-pointer active:opacity-70">
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-lg bg-zinc-800/80 flex items-center justify-center text-zinc-500"><Bell size={13}/></div>

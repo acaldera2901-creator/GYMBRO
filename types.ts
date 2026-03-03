@@ -1,7 +1,7 @@
 
-export type ScreenName = 'login' | 'profile-config' | 'goal-selection' | 'strength-test' | 'preferences' | 'plan-generation' | 'home' | 'calendar' | 'workout' | 'profile' | 'community';
+export type ScreenName = 'login' | 'profile-config' | 'goal-selection' | 'strength-test' | 'preferences' | 'plan-generation' | 'home' | 'calendar' | 'workout' | 'profile' | 'community' | 'custom-workout-builder';
 
-export type CategoryType = 'Massa' | 'Definizione' | 'Perdita Peso' | 'Resistenza';
+export type CategoryType = 'Massa' | 'Definizione' | 'Perdita Peso' | 'Resistenza' | 'Custom';
 export type BadgeTier = 'locked' | 'bronze' | 'silver' | 'gold' | 'diamond' | 'legendary';
 export type ChallengeStatus = 'pending' | 'active' | 'completed' | 'expired_win' | 'expired_loss' | 'rejected';
 
@@ -26,6 +26,7 @@ export interface WorkoutCard {
   isCompleted?: boolean; 
   completedDuration?: number; 
   isChallenge?: boolean;
+  isCustom?: boolean;
 }
 
 export interface Badge {
