@@ -308,10 +308,25 @@ const CATEGORY_INFO: Record<CategoryType, { color: string, icon: React.ElementTy
 const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ 
     onBack, customWorkouts, onWorkoutComplete, initialWorkoutId, isDarkMode, userProfile, onCreateWorkout, onShareToCommunity
 }) => {
-  const activeDatabase = customWorkouts && customWorkouts.length > 0 ? customWorkouts : WORKOUTS_DATABASE_DEFAULT;
+  // MERGE: libreria default (20 schede) + schede custom dell'utente (non duplicare)
+  const activeDatabase = useMemo(() => {
+      const defaults = [...WORKOUTS_DATABASE_DEFAULT];
+      if (!customWorkouts || customWorkouts.length === 0) return defaults;
+      
+      // Separa le schede custom/utente da quelle che matchano il default
+      const customOnly = customWorkouts.filter(cw => {
+          // È una scheda custom creata dall'utente
+          if (cw.isCustom || cw.category === 'Custom') return true;
+          // È una scheda del piano generato che NON esiste già nella libreria default
+          return !defaults.some(d => d.id === cw.id);
+      });
+      
+      return [...defaults, ...customOnly];
+  }, [customWorkouts]);
+  
   const hasWorkouts = activeDatabase.length > 0;
   
-  const defaultCategory: CategoryType = hasWorkouts ? activeDatabase[0].category : 'Massa';
+  const defaultCategory: CategoryType = 'Massa';
   const gender = userProfile?.gender === 'Donna' ? 'Donna' : 'Uomo';
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>(defaultCategory);
@@ -339,14 +354,16 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
 
   useEffect(() => {
     if (initialWorkoutId && hasWorkouts) {
-        let found: WorkoutCard | undefined = activeDatabase.find(w => w.id === initialWorkoutId);
+        // Cerca in tutto: libreria default + custom + piano utente
+        const allSearchable = [...activeDatabase, ...(customWorkouts || [])];
+        let found: WorkoutCard | undefined = allSearchable.find(w => w.id === initialWorkoutId);
 
         // Handle scheduled workouts with prefixed IDs
         if (!found && initialWorkoutId.startsWith('sched_')) {
             const parts = initialWorkoutId.split('_');
             if (parts.length > 2) {
                 const originalId = parts.slice(2).join('_');
-                found = activeDatabase.find(w => w.id === originalId);
+                found = allSearchable.find(w => w.id === originalId);
             }
         }
 
@@ -360,7 +377,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
             }
         }
     }
-  }, [initialWorkoutId, activeDatabase, hasWorkouts]);
+  }, [initialWorkoutId, activeDatabase, customWorkouts, hasWorkouts]);
 
   const { displayWorkouts, customWorkoutsList } = useMemo(() => {
       const custom = activeDatabase.filter(w => w.isCustom || w.category === 'Custom');
