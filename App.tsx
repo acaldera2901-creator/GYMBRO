@@ -405,12 +405,10 @@ const App: React.FC = () => {
           setupProfileRef.current = { ...setupProfileRef.current, goal: g };
           setUserProfile(p=>({...p, goal: g}));
           if (g === 'custom') {
-            // Salta il piano generato, vai alle preferenze con scheda vuota
+            // Personalizzato: va comunque al test massimali, salta solo la generazione piano
             setupProfileRef.current = { ...setupProfileRef.current, currentPlan: [] };
-            setCurrentScreen('preferences');
-          } else {
-            setCurrentScreen('strength-test');
           }
+          setCurrentScreen('strength-test');
         }} />;
       case 'strength-test': return <StrengthTestScreen onNext={(d) => {
           const safeWeight = parseFloat(d.testWeight.toString());
@@ -435,7 +433,12 @@ const App: React.FC = () => {
                   }
               }));
           }
-          setCurrentScreen('plan-generation');
+          // Se obiettivo personalizzato, salta la generazione piano → vai a preferenze
+          if (setupProfileRef.current?.goal === 'custom') {
+              setCurrentScreen('preferences');
+          } else {
+              setCurrentScreen('plan-generation');
+          }
       }} />;
       case 'plan-generation': return <PlanGenerationScreen userProfile={{...userProfile, knownMaxes: (setupProfileRef.current as any)?.knownMaxes || null}} onPlanGenerated={(w, calculatedMaxes) => {
           setupProfileRef.current = { ...setupProfileRef.current, currentPlan: w, maxes: calculatedMaxes };
