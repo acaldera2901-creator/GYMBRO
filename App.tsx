@@ -532,7 +532,14 @@ const App: React.FC = () => {
             const updated = [workout, ...generatedWorkouts];
             setGeneratedWorkouts(updated);
             setUserProfile(p => ({ ...p, currentPlan: updated }));
-            setSelectedWorkoutId(workout.id);
+            
+            // Rigenera il calendario con i nuovi workout + giorni dell'utente
+            if (userProfile.trainingDays && userProfile.trainingDays.length > 0) {
+              generateFutureSchedule(updated, userProfile.trainingDays, workoutSchedule);
+            }
+            
+            // Vai alla libreria (non al dettaglio) così l'utente vede tutte le schede
+            setSelectedWorkoutId(null);
             setCurrentScreen('workout');
           }}
           isDarkMode={isDarkMode}
