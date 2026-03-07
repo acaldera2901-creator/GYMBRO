@@ -11,7 +11,7 @@ interface WorkoutDetailScreenProps {
   isDarkMode: boolean;
   userProfile?: UserProfile;
   onShareToCommunity?: (post: Post) => void;
-  onCreateWorkout?: (workout: WorkoutCard) => void;
+  onCreateWorkout?: () => void;
 }
 
 // --- FULL LIBRARY (20 Schede) ---

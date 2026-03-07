@@ -16,8 +16,8 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate, isDark
   const navItems = [
     { screen: 'home' as ScreenName, icon: Home, id: 'nav-home', label: 'Home' },
     { screen: 'calendar' as ScreenName, icon: Calendar, id: 'nav-calendar', label: 'Piano' },
-    { screen: 'workout' as ScreenName, icon: Dumbbell, id: 'nav-community', label: 'Allena', isCenter: true },
-    { screen: 'community' as ScreenName, icon: Users, id: 'nav-workout', label: 'Social' },
+    { screen: 'workout' as ScreenName, icon: Dumbbell, id: 'nav-workout', label: 'Allena', isCenter: true },
+    { screen: 'community' as ScreenName, icon: Users, id: 'nav-community', label: 'Social' },
     { screen: 'profile' as ScreenName, icon: User, id: 'nav-profile', label: 'Profilo' },
   ];
 
@@ -26,7 +26,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate, isDark
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none px-4 pb-3">
-      <div className="pointer-events-auto w-full max-w-sm bg-zinc-900/90 backdrop-blur-2xl border border-zinc-800/60 rounded-[2rem] px-5 py-3 flex items-center justify-between shadow-2xl shadow-black/40">
+      <div className={`pointer-events-auto w-full max-w-sm ${isDarkMode ? "bg-zinc-900/90 border-zinc-800/60" : "bg-white/90 border-slate-200/80"} backdrop-blur-2xl border rounded-[2rem] px-5 py-3 flex items-center justify-between shadow-2xl shadow-black/40`}>
         {navItems.map(({ screen, icon: Icon, id, label, isCenter }) => {
           const isActive = currentScreen === screen;
           if (isCenter) {

@@ -78,7 +78,18 @@ const App: React.FC = () => {
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
   const [showCoachMarks, setShowCoachMarks] = useState(false);
   const [showBadgeUnlock, setShowBadgeUnlock] = useState<Badge | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('gymbro_dark_mode');
+    return saved !== null ? saved === 'true' : true; // default dark
+  });
+  
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const next = !prev;
+      localStorage.setItem('gymbro_dark_mode', String(next));
+      return next;
+    });
+  };
 
   const themeColor = userProfile.gender === 'Donna' ? 'rose' : 'emerald';
   const isFetchingRef = useRef(false);
@@ -503,7 +514,19 @@ const App: React.FC = () => {
           onScheduleWorkout={(d,w)=> { const nw = {...w, id: `sched_${Date.now()}_${w.id}`}; setWorkoutSchedule(p=>({...p, [d]:[...(p[d]||[]), nw]})); }} 
           onRemoveWorkout={(date, id)=>{
              const workout = workoutSchedule[date]?.find(w => w.id === id);
-             if (workout) handleDeleteWorkout(id);
+             if (!workout) return;
+             if (workout.isCompleted || String(id).startsWith('done_') || String(id).startsWith('db_')) {
+               // Completed workout - revert from DB
+               handleDeleteWorkout(id);
+             } else {
+               // Scheduled but not completed - just remove from local state
+               setWorkoutSchedule(prev => {
+                 const next = { ...prev };
+                 if (next[date]) next[date] = next[date].filter(w => w.id !== id);
+                 if (next[date]?.length === 0) delete next[date];
+                 return next;
+               });
+             }
           }} 
           onStartWorkout={(id)=>{setSelectedWorkoutId(id); setCurrentScreen('workout');}} 
           onNavigateHome={()=>setCurrentScreen('home')} 
@@ -516,7 +539,7 @@ const App: React.FC = () => {
           userProfile={userProfile}
           userStats={userStats}
           isDarkMode={isDarkMode}
-          toggleTheme={()=>setIsDarkMode(!isDarkMode)}
+          toggleTheme={toggleDarkMode}
           onEditProfile={()=>setCurrentScreen('profile-config')}
           themeColor={themeColor}
           workoutSchedule={workoutSchedule}

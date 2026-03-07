@@ -123,6 +123,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
                             className="block w-full pl-11 pr-4 py-4 bg-[#1c1c1e] rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all font-medium text-sm"
                             placeholder="nome@email.com"
                         />
@@ -139,6 +140,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                             type={showPassword ? "text" : "password"}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
                             className="block w-full pl-11 pr-12 py-4 bg-[#1c1c1e] rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all font-medium text-sm"
                             placeholder="••••••••"
                         />
