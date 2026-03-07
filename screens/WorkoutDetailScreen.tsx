@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Dumbbell, Flame, Activity, Zap, Timer, ChevronLeft, Play, CheckCircle2, Clock, X, Trophy, StopCircle, Camera, ChevronRight, LayoutDashboard, Minus, Pause, Swords, Trash2, Save, SkipForward, FastForward, Calendar, History, Sparkles } from 'lucide-react';
 import { CategoryType, WorkoutCard, Post, UserProfile, ScreenName } from '../types';
+import { getWorkoutImage } from '../lib/workoutImages';
+
 
 interface WorkoutDetailScreenProps {
   onBack: () => void;
@@ -19,6 +21,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     // --- 1. CATEGORIA: MASSA (Ipertrofia) ---
     {
         id: 'mas_1',
+        image: 'https://images.unsplash.com/photo-1534368786749-b63e05c90863?q=80&w=800&auto=format&fit=crop',
         category: 'Massa',
         title: 'Petto e Tricipiti',
         focus: 'Spinta e Tensione Meccanica',
@@ -34,6 +37,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'mas_2',
+        image: 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?q=80&w=800&auto=format&fit=crop',
         category: 'Massa',
         title: 'Dorso e Bicipiti',
         focus: 'Trazione e Spessore',
@@ -49,6 +53,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'mas_3',
+        image: 'https://images.unsplash.com/photo-1574680178050-55c6a6a96e0a?q=80&w=800&auto=format&fit=crop',
         category: 'Massa',
         title: 'Gambe (Focus Quad)',
         focus: 'Volume Arti Inferiori',
@@ -63,6 +68,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'mas_4',
+        image: 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?q=80&w=800&auto=format&fit=crop',
         category: 'Massa',
         title: 'Spalle & Richiamo Petto',
         focus: 'Deltoidi e Upper Chest',
@@ -77,6 +83,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'mas_5',
+        image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=800&auto=format&fit=crop',
         category: 'Massa',
         title: 'Gambe (Focus Posteriore)',
         focus: 'Femorali e Glutei',
@@ -93,6 +100,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     // --- 2. CATEGORIA: DEFINIZIONE ---
     {
         id: 'def_1',
+        image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?q=80&w=800&auto=format&fit=crop',
         category: 'Definizione',
         title: 'Upper Body Supersets',
         focus: 'Densità Spinta/Trazione',
@@ -106,6 +114,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'def_2',
+        image: 'https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?q=80&w=800&auto=format&fit=crop',
         category: 'Definizione',
         title: 'Gambe Alta Intensità',
         focus: 'Gambe e Cardio',
@@ -119,6 +128,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'def_3',
+        image: 'https://images.unsplash.com/photo-1517344884509-a0c97ec11bcc?q=80&w=800&auto=format&fit=crop',
         category: 'Definizione',
         title: 'Full Body Circuit A',
         focus: 'No Pausa (4 Giri)',
@@ -133,6 +143,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'def_4',
+        image: 'https://images.unsplash.com/photo-1581009137042-c552e485697a?q=80&w=800&auto=format&fit=crop',
         category: 'Definizione',
         title: 'Deltoidi e Braccia (Pumping)',
         focus: 'Volume Braccia e Spalle',
@@ -146,6 +157,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'def_5',
+        image: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?q=80&w=800&auto=format&fit=crop',
         category: 'Definizione',
         title: 'Full Body Lattacido B',
         focus: 'Acido Lattico',
@@ -162,6 +174,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     // --- 3. CATEGORIA: PERDITA PESO ---
     {
         id: 'fat_1',
+        image: 'https://images.unsplash.com/photo-1538805060514-97d9cc17730c?q=80&w=800&auto=format&fit=crop',
         category: 'Perdita Peso',
         title: 'PHA Basic',
         focus: 'Peripheral Heart Action',
@@ -176,6 +189,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'fat_2',
+        image: 'https://images.unsplash.com/photo-1534258936925-c58bed479fcb?q=80&w=800&auto=format&fit=crop',
         category: 'Perdita Peso',
         title: 'Functional Fat Burn',
         focus: 'Metabolico Funzionale',
@@ -189,6 +203,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'fat_3',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800&auto=format&fit=crop',
         category: 'Perdita Peso',
         title: 'PHA Advanced',
         focus: 'Alta Intensità PHA',
@@ -203,6 +218,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'fat_4',
+        image: 'https://images.unsplash.com/photo-1603287681836-b174ce5074c2?q=80&w=800&auto=format&fit=crop',
         category: 'Perdita Peso',
         title: 'Cardio Complex (Barbell)',
         focus: '4 Giri - Senza posare il bilanciere',
@@ -216,6 +232,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'fat_5',
+        image: 'https://images.unsplash.com/photo-1598971457999-ca4ef48a9a71?q=80&w=800&auto=format&fit=crop',
         category: 'Perdita Peso',
         title: 'Bodyweight HIIT',
         focus: '30s Lavoro / 15s Riposo (6 Giri)',
@@ -231,6 +248,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     // --- 4. CATEGORIA: RESISTENZA ---
     {
         id: 'res_1',
+        image: 'https://images.unsplash.com/photo-1530822847156-5df684ec5933?q=80&w=800&auto=format&fit=crop',
         category: 'Resistenza',
         title: 'Upper Body Endurance',
         focus: 'Alte Ripetizioni',
@@ -245,6 +263,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'res_2',
+        image: 'https://images.unsplash.com/photo-1434682881908-b43d0467b798?q=80&w=800&auto=format&fit=crop',
         category: 'Resistenza',
         title: 'Lower Body Endurance',
         focus: 'Resistenza Gambe',
@@ -259,6 +278,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'res_3',
+        image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=800&auto=format&fit=crop',
         category: 'Resistenza',
         title: 'Isometrica e Core',
         focus: 'Tenuta Statica',
@@ -272,6 +292,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'res_4',
+        image: 'https://images.unsplash.com/photo-1577221084712-45b0445d2b00?q=80&w=800&auto=format&fit=crop',
         category: 'Resistenza',
         title: 'Circuito "100 Reps"',
         focus: 'Volume Totale',
@@ -284,6 +305,7 @@ const WORKOUTS_DATABASE_DEFAULT: WorkoutCard[] = [
     },
     {
         id: 'res_5',
+        image: 'https://images.unsplash.com/photo-1548690312-e3b507d8c110?q=80&w=800&auto=format&fit=crop',
         category: 'Resistenza',
         title: 'Cardio-Resistenza Mista',
         focus: 'Endurance Funzionale',
@@ -708,20 +730,33 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                     </button>
                   )}
                 </div>
-                {displayWorkouts.map((w) => (
-                    <div key={w.id} onClick={() => setActiveWorkout(w)} className={`flex items-center gap-4 p-4 rounded-3xl cursor-pointer active:scale-98 transition-transform ${theme.card}`}>
-                        <div className={`w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center shrink-0 text-zinc-600`}>
-                            <Dumbbell size={24} />
+                {displayWorkouts.map((w) => {
+                    const catInfo = CATEGORY_INFO[w.category] || CATEGORY_INFO['Massa'];
+                    const catColors: Record<string, string> = {
+                        'Massa': '#10b981', 'Definizione': '#8b5cf6',
+                        'Perdita Peso': '#f97316', 'Resistenza': '#3b82f6', 'Custom': '#a855f7'
+                    };
+                    const catColor = catColors[w.category] || '#10b981';
+                    return (
+                    <div key={w.id} onClick={() => setActiveWorkout(w)} className={`flex items-center gap-4 p-3 rounded-3xl cursor-pointer active:scale-[0.98] transition-transform ${theme.card} border overflow-hidden`}>
+                        {/* Image thumbnail */}
+                        <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 relative">
+                            <img src={getWorkoutImage(w)} alt={w.title} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h4 className={`font-bold ${theme.text} truncate`}>{w.title}</h4>
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: catColor }}>{w.category}</span>
+                            </div>
+                            <h4 className={`font-bold text-sm ${theme.text} truncate leading-tight`}>{w.title}</h4>
                             <p className={`text-xs ${theme.textSub} mt-0.5`}>{w.exercises.length} Esercizi • 45 Min</p>
                         </div>
-                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center ${isDarkMode ? 'border-zinc-700 text-zinc-500' : 'border-zinc-200'}`}>
+                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 ${isDarkMode ? 'border-zinc-700 text-zinc-500' : 'border-zinc-200 text-zinc-400'}`}>
                             <ChevronRight size={16} />
                         </div>
                     </div>
-                ))}
+                    );
+                })}
                 {displayWorkouts.length === 0 && (
                     <div className="text-center py-10 opacity-50">
                         <Dumbbell size={32} className="mx-auto mb-2 text-zinc-500" />
@@ -741,7 +776,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   return (
       <div className={`min-h-screen ${theme.bg} pb-24`}>
           <div className="relative h-[50vh]">
-              <img src={gender === 'Donna' ? (CATEGORY_INFO[activeWorkout.category] || CATEGORY_INFO['Massa']).imageWomen : (CATEGORY_INFO[activeWorkout.category] || CATEGORY_INFO['Massa']).imageMen} className="w-full h-full object-cover" />
+              <img src={getWorkoutImage(activeWorkout)} className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
               <button onClick={() => setActiveWorkout(null)} className="absolute top-14 left-6 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center"><ChevronLeft size={24}/></button>
               

@@ -4,6 +4,8 @@ import {
   BarChart2, Zap, Play, Trophy, ChevronRight, Flame
 } from 'lucide-react';
 import { WorkoutCard, UserProfile, UserStats } from '../types';
+import { getWorkoutImage } from '../lib/workoutImages';
+
 
 export interface Step {
   targetId: string;
@@ -119,11 +121,6 @@ const PlanVisual: React.FC<{ accent: string; workouts?: WorkoutCard[]; schedule?
 const LibraryVisual: React.FC<{ accent: string; workouts?: WorkoutCard[] }> = ({ accent, workouts }) => {
   const catColors: Record<string, string> = { 'Massa': '#10b981', 'Definizione': '#8b5cf6', 'Perdita Peso': '#f97316', 'Resistenza': '#3b82f6', 'Custom': '#a855f7' };
   const items = (workouts || []).slice(0, 3);
-  const fallbackImgs = [
-    'https://images.unsplash.com/photo-1534368786749-b63e05c90863?q=80&w=200&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?q=80&w=200&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1574680178050-55c6a6a96e0a?q=80&w=200&auto=format&fit=crop',
-  ];
   return (
     <div className="space-y-2">
       {items.map((w, i) => {
@@ -131,7 +128,7 @@ const LibraryVisual: React.FC<{ accent: string; workouts?: WorkoutCard[] }> = ({
         return (
           <div key={w.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/8">
             <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0">
-              <img src={(w as any).image || fallbackImgs[i % 3]} alt={w.title} className="w-full h-full object-cover" />
+              <img src={getWorkoutImage(w)} alt={w.title} className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white font-bold text-xs truncate">{w.title}</p>

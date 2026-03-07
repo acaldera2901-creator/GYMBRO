@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dumbbell, Bell, X, Star, ArrowUpRight, Play, Plus, Activity, Flame, Users, BarChart2, Calendar as CalendarIcon, ChevronRight } from 'lucide-react';
 import { ScreenName, UserProfile, UserStats, WorkoutCard, AppNotification } from '../types';
+import { getWorkoutImage } from '../lib/workoutImages';
+
 
 interface HomeScreenProps {
   onNavigate: (screen: ScreenName) => void;
@@ -230,13 +232,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               className={`flex items-center gap-3.5 p-3 rounded-2xl ${theme.card} border cursor-pointer active:scale-[0.98] transition-transform overflow-hidden`}>
               {/* Image thumbnail */}
               <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 relative">
-                {(w as any).image ? (
-                  <img src={(w as any).image} alt={w.title} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: `${catColor}20` }}>
-                    <Dumbbell size={18} style={{ color: catColor }} />
-                  </div>
-                )}
+                <img src={getWorkoutImage(w)} alt={w.title} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
               </div>
               <div className="flex-1 min-w-0">
