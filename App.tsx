@@ -13,7 +13,7 @@ import CalendarScreen from './screens/CalendarScreen';
 import CommunityScreen from './screens/CommunityScreen';
 import CustomWorkoutBuilder from './screens/CustomWorkoutBuilder';
 import BottomNav from './components/BottomNav';
-import CoachMarks, { Step } from './components/CoachMarks';
+import CoachMarks from './components/CoachMarks';
 import { ScreenName, UserProfile, WorkoutCard, UserStats, Post, Badge, Challenge, AppNotification, Story, LeaderboardEntry, Comment, ChallengeStatus } from './types';
 import { supabase, fetchUserData, completeWorkoutTransaction, revertWorkoutTransaction, updateGuestProfile, saveFullProfile, fetchCommunityPosts, createPost, toggleLikePost } from './lib/supabase';
 import { Loader2, Medal } from 'lucide-react';
@@ -49,12 +49,6 @@ const DEFAULT_STATS: UserStats = {
     maxes: { bench: 50, squat: 70, deadlift: 90 } 
 };
 
-const TUTORIAL_STEPS: Step[] = [
-    { targetId: 'orbit-profile', title: 'La tua Dashboard', desc: 'Tocca qui per vedere i tuoi progressi, medaglie e statistiche.', position: 'bottom' },
-    { targetId: 'action-workout-main', title: 'Allenati', desc: 'Avvia subito il tuo allenamento programmato per oggi.', position: 'top' },
-    { targetId: 'card-next-workout', title: 'Prossimo Workout', desc: 'Qui trovi i dettagli della tua prossima scheda.', position: 'top' },
-    { targetId: 'nav-community', title: 'Social & Sfide', desc: 'Entra nell\'arena per sfidare altri atleti e scalare la classifica.', position: 'top' },
-];
 
 const App: React.FC = () => {
   // --- STATE ---
@@ -605,7 +599,17 @@ const App: React.FC = () => {
   return (
     <>
       {renderScreen()}
-      {showCoachMarks && <CoachMarks steps={TUTORIAL_STEPS} onComplete={()=>{setShowCoachMarks(false); localStorage.setItem('hasSeenCoachMarks','true');}} themeColor={themeColor} />}
+      {showCoachMarks && (
+        <CoachMarks
+          steps={[]}
+          onComplete={() => { setShowCoachMarks(false); localStorage.setItem('hasSeenCoachMarks', 'true'); }}
+          themeColor={themeColor}
+          userProfile={userProfile}
+          userStats={userStats}
+          generatedWorkouts={generatedWorkouts}
+          workoutSchedule={workoutSchedule}
+        />
+      )}
       {currentScreen!=='login' && showBottomNav && <BottomNav currentScreen={currentScreen} onNavigate={setCurrentScreen} isDarkMode={isDarkMode} themeColor={themeColor} />}
       {showBadgeUnlock && (
         <div className="fixed top-16 left-4 right-4 z-[200] animate-in slide-in-from-top-4 fade-in duration-500">
