@@ -27,6 +27,7 @@ export interface WorkoutCard {
   completedDuration?: number; 
   isChallenge?: boolean;
   isCustom?: boolean;
+  image?: string;
 }
 
 export interface Badge {

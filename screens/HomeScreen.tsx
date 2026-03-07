@@ -219,20 +219,38 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
         <div className="space-y-2">
-          {availableWorkouts.slice(0, 3).map(w => (
+          {availableWorkouts.slice(0, 3).map(w => {
+            const catColors: Record<string, string> = {
+              'Massa': '#10b981', 'Definizione': '#8b5cf6',
+              'Perdita Peso': '#f97316', 'Resistenza': '#3b82f6', 'Custom': '#a855f7'
+            };
+            const catColor = catColors[w.category] || accentHex;
+            return (
             <div key={w.id} onClick={() => onStartWorkout(w.id)}
-              className={`flex items-center gap-3.5 p-3.5 rounded-2xl ${theme.card} border cursor-pointer active:scale-[0.98] transition-transform`}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${accentHex}15` }}>
-                <Dumbbell size={16} style={{ color: accentHex }} />
+              className={`flex items-center gap-3.5 p-3 rounded-2xl ${theme.card} border cursor-pointer active:scale-[0.98] transition-transform overflow-hidden`}>
+              {/* Image thumbnail */}
+              <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 relative">
+                {(w as any).image ? (
+                  <img src={(w as any).image} alt={w.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: `${catColor}20` }}>
+                    <Dumbbell size={18} style={{ color: catColor }} />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className={`${theme.text} font-bold text-sm truncate`}>{w.title}</p>
-                <p className={`${theme.textSub} text-xs mt-0.5`}>{w.category} · {w.exercises.length} esercizi</p>
+                <p className={`${theme.textSub} text-xs mt-0.5`}>
+                  <span style={{ color: catColor }} className="font-semibold">{w.category}</span>
+                  {' · '}{w.exercises.length} esercizi
+                </p>
               </div>
               {w.isCustom && <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-md text-purple-400 bg-purple-500/10 border border-purple-500/20 shrink-0">Custom</span>}
               <ChevronRight size={14} className={`${theme.textMuted} shrink-0`} />
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
