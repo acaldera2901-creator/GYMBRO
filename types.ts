@@ -124,7 +124,9 @@ export interface UserProfile {
   favoriteExercises: string[]; 
   currentPlan?: WorkoutCard[]; 
   tutorialSeen?: boolean; 
-  communityTutorialSeen?: boolean; 
+  communityTutorialSeen?: boolean;
+  experience?: 'beginner' | 'intermediate' | 'advanced';
+  equipment?: 'full_gym' | 'home_gym' | 'bodyweight';
 }
 
 export interface Comment {

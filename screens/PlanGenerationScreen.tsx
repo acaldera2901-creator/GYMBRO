@@ -318,67 +318,104 @@ const PlanGenerationScreen: React.FC<PlanGenerationScreenProps> = ({ userProfile
         setStatus('Derivazione profilo di forza completo...');
 
         // STEP 2: Costruzione profilo di forza
-        // Priorità: 1) massimali reali inseriti dall'utente (knownMaxes)
-        //           2) stima tramite ratio IPF per i missing
-        const isWoman = (userProfile.gender === 'Donna');
+        // REGOLA CHIAVE: i valori REALI inseriti dall'utente sono sacri.
+        // I massimali MANCANTI vengono stimati SOLO dai valori reali, con ratio esperienza-adattativi.
+        const isWoman    = (userProfile.gender === 'Donna');
+        const experience = (userProfile as any).experience || 'intermediate';
 
-        // Ratio genere-specifici (IPF statistics, atleti natural intermedi)
-        const R_SQ_FROM_B  = isWoman ? 1.45 : 1.35;  // Squat da Bench
-        const R_DL_FROM_B  = isWoman ? 1.65 : 1.60;  // Deadlift da Bench
-        const R_B_FROM_SQ  = 1 / R_SQ_FROM_B;
-        const R_DL_FROM_SQ = R_DL_FROM_B / R_SQ_FROM_B;
-        const R_B_FROM_DL  = 1 / R_DL_FROM_B;
-        const R_SQ_FROM_DL = R_SQ_FROM_B / R_DL_FROM_B;
+        // Ratio esperienza-specifici (derivati da analisi empirica su atleti natural)
+        // Principiante: gambe relativamente più forti, upper body debole
+        // Avanzato: balance più uniforme, stacco molto più alto
+        const RATIOS: Record<string, { sqFromB: number; dlFromB: number; sqFromDl: number; bFromSq: number; dlFromSq: number; bFromDl: number }> = {
+          beginner: {
+            sqFromB: isWoman ? 1.55 : 1.50,  // squat = bench × 1.50
+            dlFromB: isWoman ? 1.75 : 1.70,  // deadlift = bench × 1.70
+            bFromSq: isWoman ? 0.645 : 0.667,
+            dlFromSq: isWoman ? 1.13 : 1.13,
+            bFromDl: isWoman ? 0.571 : 0.588,
+            sqFromDl: isWoman ? 0.886 : 0.882,
+          },
+          intermediate: {
+            sqFromB: isWoman ? 1.45 : 1.35,
+            dlFromB: isWoman ? 1.65 : 1.60,
+            bFromSq: isWoman ? 0.690 : 0.741,
+            dlFromSq: isWoman ? 1.14 : 1.19,
+            bFromDl: isWoman ? 0.606 : 0.625,
+            sqFromDl: isWoman ? 0.879 : 0.844,
+          },
+          advanced: {
+            sqFromB: isWoman ? 1.40 : 1.25,
+            dlFromB: isWoman ? 1.55 : 1.50,
+            bFromSq: isWoman ? 0.714 : 0.800,
+            dlFromSq: isWoman ? 1.107 : 1.20,
+            bFromDl: isWoman ? 0.645 : 0.667,
+            sqFromDl: isWoman ? 0.903 : 0.833,
+          },
+        };
+        const R = RATIOS[experience] || RATIOS.intermediate;
 
-        // Massimali noti direttamente dall'utente (già calcolati in StrengthTestScreen)
+        // Massimali reali inseriti dall'utente
         const known = userProfile.knownMaxes || {};
         const knownBench    = (known.bench    && known.bench    > 0) ? known.bench    : null;
         const knownSquat    = (known.squat    && known.squat    > 0) ? known.squat    : null;
         const knownDeadlift = (known.deadlift && known.deadlift > 0) ? known.deadlift : null;
 
-        // Calcola il massimale dell'esercizio testato (Brzycki)
-        const testExLower = userProfile.testExercise.toLowerCase();
-        let currentBase = userProfile.testExercise;
+        const testExLower = (userProfile.testExercise || '').toLowerCase();
 
-        // Costruisci estimatedStats partendo dai valori noti
-        // Se l'utente ha inserito più massimali, usa la media pesata per maggiore accuratezza
+        // Arrotonda a multipli di 5kg per stime pulite
+        const round5 = (v: number) => Math.round(v / 5) * 5;
+
+        // LOGICA DI STIMA MIGLIORATA:
+        // 1. Se il valore è noto → usalo direttamente (nessuna stima)
+        // 2. Se mancante → stima SOLO dal valore più affidabile disponibile
+        // 3. Se nessun valore noto → fallback su direct1RM da testExercise
         let estimatedStats = { bench: 0, squat: 0, deadlift: 0 };
 
-        // Raccoglie tutte le stime disponibili per ogni esercizio
-        const benchEstimates:    number[] = [];
-        const squatEstimates:    number[] = [];
-        const deadliftEstimates: number[] = [];
-
-        if (knownBench)    { benchEstimates.push(knownBench);    squatEstimates.push(knownBench * R_SQ_FROM_B);  deadliftEstimates.push(knownBench * R_DL_FROM_B); }
-        if (knownSquat)    { squatEstimates.push(knownSquat);    benchEstimates.push(knownSquat * R_B_FROM_SQ);  deadliftEstimates.push(knownSquat * R_DL_FROM_SQ); }
-        if (knownDeadlift) { deadliftEstimates.push(knownDeadlift); benchEstimates.push(knownDeadlift * R_B_FROM_DL); squatEstimates.push(knownDeadlift * R_SQ_FROM_DL); }
-
-        // Se nessun massimale noto, usa il 1RM calcolato dal testExercise
-        if (benchEstimates.length === 0 && squatEstimates.length === 0 && deadliftEstimates.length === 0) {
-            if (testExLower.includes('panca') || testExLower.includes('bench')) {
-                benchEstimates.push(direct1RM);
-                squatEstimates.push(direct1RM * R_SQ_FROM_B);
-                deadliftEstimates.push(direct1RM * R_DL_FROM_B);
-            } else if (testExLower.includes('squat')) {
-                squatEstimates.push(direct1RM);
-                benchEstimates.push(direct1RM * R_B_FROM_SQ);
-                deadliftEstimates.push(direct1RM * R_DL_FROM_SQ);
+        if (knownBench && knownSquat && knownDeadlift) {
+            // Caso perfetto: tutti e 3 inseriti
+            estimatedStats = { bench: knownBench, squat: knownSquat, deadlift: knownDeadlift };
+        } else if (knownBench && knownSquat) {
+            estimatedStats = { bench: knownBench, squat: knownSquat, deadlift: round5((knownBench * R.dlFromB + knownSquat * R.dlFromSq) / 2) };
+        } else if (knownBench && knownDeadlift) {
+            estimatedStats = { bench: knownBench, squat: round5((knownBench * R.sqFromB + knownDeadlift * R.sqFromDl) / 2), deadlift: knownDeadlift };
+        } else if (knownSquat && knownDeadlift) {
+            estimatedStats = { bench: round5((knownSquat * R.bFromSq + knownDeadlift * R.bFromDl) / 2), squat: knownSquat, deadlift: knownDeadlift };
+        } else if (knownBench) {
+            // Solo bench → stima squat e deadlift dai ratio, arrotonda a 5kg
+            estimatedStats = { bench: knownBench, squat: round5(knownBench * R.sqFromB), deadlift: round5(knownBench * R.dlFromB) };
+        } else if (knownSquat) {
+            estimatedStats = { bench: round5(knownSquat * R.bFromSq), squat: knownSquat, deadlift: round5(knownSquat * R.dlFromSq) };
+        } else if (knownDeadlift) {
+            estimatedStats = { bench: round5(knownDeadlift * R.bFromDl), squat: round5(knownDeadlift * R.sqFromDl), deadlift: knownDeadlift };
+        } else {
+            // Nessun massimale noto: usa direct1RM dal testExercise
+            if (direct1RM > 0) {
+                if (testExLower.includes('panca') || testExLower.includes('bench')) {
+                    estimatedStats = { bench: round5(direct1RM), squat: round5(direct1RM * R.sqFromB), deadlift: round5(direct1RM * R.dlFromB) };
+                } else if (testExLower.includes('squat')) {
+                    estimatedStats = { bench: round5(direct1RM * R.bFromSq), squat: round5(direct1RM), deadlift: round5(direct1RM * R.dlFromSq) };
+                } else {
+                    estimatedStats = { bench: round5(direct1RM * R.bFromDl), squat: round5(direct1RM * R.sqFromDl), deadlift: round5(direct1RM) };
+                }
             } else {
-                deadliftEstimates.push(direct1RM);
-                benchEstimates.push(direct1RM * R_B_FROM_DL);
-                squatEstimates.push(direct1RM * R_SQ_FROM_DL);
+                // Fallback di emergenza basato su peso corporeo e livello
+                const bw = (userProfile as any).weight || 70;
+                const bwMultipliers: Record<string, { b: number; s: number; d: number }> = {
+                  beginner:     { b: 0.6, s: 0.9, d: 1.0 },
+                  intermediate: { b: 0.9, s: 1.25, d: 1.45 },
+                  advanced:     { b: 1.2, s: 1.6, d: 1.8 },
+                };
+                const m = bwMultipliers[experience] || bwMultipliers.intermediate;
+                estimatedStats = { bench: round5(bw * m.b), squat: round5(bw * m.s), deadlift: round5(bw * m.d) };
             }
         }
 
-        // Media delle stime (se l'utente ha inserito più massimali, la media è più precisa)
-        const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        // Garanzia: nessun valore a zero (minimo di sicurezza)
+        if (estimatedStats.bench    <= 0) estimatedStats.bench    = round5((estimatedStats.squat || 60) * R.bFromSq);
+        if (estimatedStats.squat    <= 0) estimatedStats.squat    = round5((estimatedStats.bench || 60) * R.sqFromB);
+        if (estimatedStats.deadlift <= 0) estimatedStats.deadlift = round5((estimatedStats.bench || 60) * R.dlFromB);
 
-        // I valori REALI inseriti dall'utente hanno precedenza assoluta sulla stima
-        estimatedStats.bench    = knownBench    || avg(benchEstimates);
-        estimatedStats.squat    = knownSquat    || avg(squatEstimates);
-        estimatedStats.deadlift = knownDeadlift || avg(deadliftEstimates);
-
-        setBaseUsed(currentBase);
+        setBaseUsed(userProfile.testExercise);
         setStatus(`Bench: ${Math.round(estimatedStats.bench)}kg | Squat: ${Math.round(estimatedStats.squat)}kg | Stacco: ${Math.round(estimatedStats.deadlift)}kg`);
 
         setProgress(40);
