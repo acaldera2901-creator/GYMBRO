@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Bell, X, ArrowUpRight, Play, Plus, Activity, Flame, Users, BarChart2, Calendar as CalendarIcon, ChevronRight, Droplets, Beef, Wheat, Zap } from 'lucide-react';
+import { Dumbbell, Bell, X, Star, ArrowUpRight, Play, Plus, Activity, Flame, Users, BarChart2, Calendar as CalendarIcon, ChevronRight, Droplets, Beef, Wheat, Zap } from 'lucide-react';
 import { ScreenName, UserProfile, UserStats, WorkoutCard, AppNotification } from '../types';
 import { getWorkoutImage } from '../lib/workoutImages';
+
 
 interface HomeScreenProps {
   onNavigate: (screen: ScreenName) => void;
@@ -16,28 +16,28 @@ interface HomeScreenProps {
   onMarkNotificationsRead?: () => void;
 }
 
-const T = {
-  bg: '#07070A', bg2: '#0F0F14', bg3: '#16161D',
-  border: 'rgba(255,255,255,0.07)', border2: 'rgba(255,255,255,0.12)',
-  lime: '#C8FF00', coral: '#FF5D3B', amber: '#FFB347', sky: '#38BDF8', violet: '#A78BFA',
-  muted: '#6B6B80', muted2: '#8E8EA0', text: '#F0F0F5',
-  display: "'Bebas Neue', sans-serif", body: "'DM Sans', sans-serif",
-};
-
-// Rose variant keeps the coral accent for female theme
-const getAccent = (themeColor: string) => themeColor === 'rose' ? '#FF5D3B' : T.lime;
-const getGlow   = (themeColor: string) => themeColor === 'rose' ? 'rgba(255,93,59,0.2)' : 'rgba(200,255,0,0.18)';
-
 const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigate, userProfile, userStats, availableWorkouts,
-  onStartWorkout, isDarkMode, themeColor, notifications = [], onMarkNotificationsRead,
+  onStartWorkout, isDarkMode, themeColor, notifications = [], onMarkNotificationsRead
 }) => {
-  const accent  = getAccent(themeColor);
-  const glow    = getGlow(themeColor);
   const firstName = userProfile.name ? userProfile.name.split(' ')[0] : 'Atleta';
-  const unread  = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const isRose = themeColor === 'rose';
+  const accentHex = isRose ? '#f43f5e' : '#10b981';
+  const accentBg = isRose ? 'bg-rose-500' : 'bg-emerald-500';
+  const accent = isRose ? 'text-rose-400' : 'text-emerald-400';
+  const theme = {
+    bg: isDarkMode ? 'bg-[#080808]' : 'bg-[#f0f0f5]',
+    text: isDarkMode ? 'text-white' : 'text-slate-900',
+    textSub: isDarkMode ? 'text-zinc-600' : 'text-slate-500',
+    textMuted: isDarkMode ? 'text-zinc-500' : 'text-slate-400',
+    card: isDarkMode ? 'bg-zinc-900/70 border-zinc-800/50' : 'bg-white border-slate-200 shadow-sm',
+    cardBtn: isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm',
+    label: isDarkMode ? 'text-zinc-600' : 'text-slate-500',
+    fixedBg: isDarkMode ? 'rgba(8,8,8,0.85)' : 'rgba(240,240,245,0.85)',
+  };
 
-  const [showNotif, setShowNotif] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [workoutIdx, setWorkoutIdx] = useState(0);
 
   useEffect(() => {
@@ -48,8 +48,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const todayWorkout = availableWorkouts.length > 0 ? availableWorkouts[workoutIdx] : null;
 
-  const todayLabel = useMemo(() =>
-    new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }), []);
+  const todayLabel = useMemo(() => {
+    return new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  }, []);
 
   const isTrainingDay = useMemo(() => {
     const dow = new Date().getDay();
@@ -57,310 +58,277 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     return (userProfile.trainingDays || []).includes(appDay);
   }, [userProfile.trainingDays]);
 
-  const QUICK_ACTIONS = [
-    { label: 'Piano',       icon: CalendarIcon, screen: 'calendar'              as ScreenName, color: '#6366F1' },
-    { label: 'Social',      icon: Users,        screen: 'community'             as ScreenName, color: T.amber   },
-    { label: 'Statistiche', icon: BarChart2,     screen: 'profile'              as ScreenName, color: T.sky     },
-    { label: 'Crea\nScheda',icon: Plus,          screen: 'custom-workout-builder' as ScreenName, color: accent  },
-  ];
-
-  const CAT_COLORS: Record<string, string> = {
-    'Massa': T.lime, 'Definizione': T.violet,
-    'Perdita Peso': T.coral, 'Resistenza': T.sky, 'Custom': '#A855F7',
+  const handleToggleNotif = () => {
+    if (!showNotifications && onMarkNotificationsRead) onMarkNotificationsRead();
+    setShowNotifications(v => !v);
   };
 
-  // Nutrition calc
-  const { kcal, protein, carbs, fat } = useMemo(() => {
-    const w = userProfile.weight || 75;
-    const m: Record<string, any> = {
-      muscle:      { kcal: 36, protein: 2.2, carbs: 4.5, fat: 1.0 },
-      definition:  { kcal: 29, protein: 2.4, carbs: 2.5, fat: 0.9 },
-      weight_loss: { kcal: 24, protein: 2.0, carbs: 2.0, fat: 0.7 },
-      endurance:   { kcal: 33, protein: 1.6, carbs: 5.5, fat: 0.8 },
-    };
-    const v = m[userProfile.goal] || m.muscle;
-    return { kcal: Math.round(w * v.kcal), protein: Math.round(w * v.protein), carbs: Math.round(w * v.carbs), fat: Math.round(w * v.fat) };
-  }, [userProfile.weight, userProfile.goal]);
-
-  // ── SHARED STYLE HELPERS ─────────────────────────────────────────────────────
-  const card: React.CSSProperties = { background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 22 };
+  const QUICK_ACTIONS = [
+    { label: 'Calendario', icon: CalendarIcon, screen: 'calendar' as ScreenName, color: '#6366f1' },
+    { label: 'Community', icon: Users, screen: 'community' as ScreenName, color: '#f59e0b' },
+    { label: 'Statistiche', icon: BarChart2, screen: 'profile' as ScreenName, color: '#06b6d4' },
+    { label: 'Crea Scheda', icon: Plus, screen: 'custom-workout-builder' as ScreenName, color: accentHex },
+  ];
 
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.body, paddingBottom: 112, overflowX: 'hidden', position: 'relative' }}>
+    <div className={`min-h-screen ${theme.bg} pb-28 overflow-x-hidden`}>
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full opacity-20 blur-[100px]" style={{ backgroundColor: accentHex }} />
+        <div className="absolute top-1/3 -right-20 w-64 h-64 rounded-full opacity-10 blur-[80px] bg-blue-500" />
+      </div>
 
-      {/* Background orbs */}
-      <div style={{ position: 'fixed', top: -80, left: -80, width: 320, height: 320, borderRadius: '50%', background: `${accent}08`, filter: 'blur(100px)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', top: '40%', right: -60, width: 220, height: 220, borderRadius: '50%', background: 'rgba(56,189,248,0.05)', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
-
-      {/* HEADER ─────────────────────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', zIndex: 1, padding: '56px 20px 12px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      {/* HEADER */}
+      <div className="relative px-5 pt-14 pb-4">
+        <div className="flex items-start justify-between">
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'capitalize', letterSpacing: '0.06em' }}>{todayLabel}</div>
-            <div style={{ fontFamily: T.display, fontSize: 46, color: T.text, lineHeight: 1 }}>
-              CIAO, <span style={{ color: accent }}>{firstName.toUpperCase()}</span>
-            </div>
+            <p className={`${theme.textSub} text-xs font-medium capitalize`}>{todayLabel}</p>
+            <h1 className={`text-3xl font-black ${theme.text} mt-0.5`}>
+              Ciao, <span style={{ color: accentHex }}>{firstName}</span>
+            </h1>
             {isTrainingDay ? (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 6, background: `${accent}10`, border: `1px solid ${accent}25`, borderRadius: 100, padding: '4px 10px 4px 6px' }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: accent, animation: 'pulse 2s ease-in-out infinite' }} />
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', color: accent }}>GIORNO DI ALLENAMENTO</span>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentHex }} />
+                <span className="text-xs font-bold" style={{ color: accentHex }}>Giorno di allenamento</span>
               </div>
             ) : (
-              <div style={{ marginTop: 6, fontSize: 12, color: T.muted }}>Giorno di riposo 💤</div>
+              <p className={`${theme.textSub} text-xs mt-1`}>Giorno di riposo 💤</p>
             )}
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-            {/* Avatar */}
-            <button onClick={() => onNavigate('profile')} style={{ width: 44, height: 44, borderRadius: 15, background: `${accent}12`, border: `1.5px solid ${accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: `0 0 14px ${accent}20` }}>
-              {userProfile.image
-                ? <img src={userProfile.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} />
-                : <span style={{ fontFamily: T.display, fontSize: 20, color: accent }}>{firstName.charAt(0).toUpperCase()}</span>}
+          <div className="flex items-center gap-2">
+            {/* Foto profilo piccola */}
+            <button id="orbit-profile" onClick={() => onNavigate('profile')} className="w-10 h-10 rounded-2xl overflow-hidden border-2 active:scale-90 transition-transform shrink-0" style={{ borderColor: accentHex }}>
+              {userProfile.image ? (
+                <img src={userProfile.image} alt="profilo" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: `${accentHex}25` }}>
+                  <span className="text-sm font-black" style={{ color: accentHex }}>{firstName.charAt(0).toUpperCase()}</span>
+                </div>
+              )}
             </button>
-
-            {/* Bell */}
-            <button
-              onClick={() => { if (!showNotif && onMarkNotificationsRead) onMarkNotificationsRead(); setShowNotif(v => !v); }}
-              style={{ position: 'relative', width: 44, height: 44, borderRadius: 15, background: T.bg2, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.muted2 }}
-            >
-              {showNotif ? <X size={18} /> : <Bell size={18} />}
-              {unread > 0 && !showNotif && (
-                <div style={{ position: 'absolute', top: 8, right: 9, width: 7, height: 7, borderRadius: '50%', background: T.coral, border: `1.5px solid ${T.bg}` }} />
+            <button onClick={handleToggleNotif} className={`relative w-10 h-10 rounded-2xl ${theme.cardBtn} border flex items-center justify-center active:scale-90 transition-transform`}>
+              {showNotifications ? <X size={18} className="text-zinc-400" /> : <Bell size={18} className={theme.textMuted} />}
+              {unreadCount > 0 && !showNotifications && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-[#080808] flex items-center justify-center">
+                  <span className="text-[8px] font-black text-white">{unreadCount}</span>
+                </div>
               )}
             </button>
           </div>
         </div>
 
-        {/* Notification dropdown */}
-        {showNotif && (
-          <div style={{ position: 'absolute', top: '100%', left: 16, right: 16, zIndex: 50, marginTop: 8 }}>
-            <div style={{ ...card, padding: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Notifiche</div>
-              {notifications.length === 0
-                ? <div style={{ fontSize: 13, color: T.muted, textAlign: 'center', padding: '12px 0' }}>Nessuna notifica</div>
-                : <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
-                    {notifications.map(n => (
-                      <div key={n.id} style={{ display: 'flex', gap: 10, padding: 8, borderRadius: 12 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 10, background: `${accent}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Bell size={14} style={{ color: accent }} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700 }}>{n.title}</div>
-                          <div style={{ fontSize: 11, color: T.muted }}>{n.message}</div>
-                        </div>
+        {showNotifications && (
+          <div className="absolute top-full left-4 right-4 z-50 mt-2 animate-in slide-in-from-top-2 duration-200">
+            <div className={`${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-slate-200"} border rounded-2xl p-4 shadow-2xl`}>
+              <p className={`font-bold ${theme.text} text-sm mb-3`}>Notifiche</p>
+              {notifications.length === 0 ? (
+                <p className={`${theme.textSub} text-sm text-center py-3`}>Nessuna notifica</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {notifications.map(n => (
+                    <div key={n.id} className={`flex gap-3 p-2 rounded-xl ${isDarkMode ? "hover:bg-zinc-800" : "hover:bg-slate-100"} cursor-pointer transition-colors`}>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${accentBg}`}>
+                        {n.type === 'badge_unlock' ? <Star size={14} className="text-black" /> : <Dumbbell size={14} className="text-black" />}
                       </div>
-                    ))}
-                  </div>
-              }
+                      <div><p className={`${theme.text} text-xs font-bold`}>{n.title}</p><p className={`${theme.textSub} text-xs`}>{n.message}</p></div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* TODAY WORKOUT HERO ─────────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', zIndex: 1, padding: '0 20px 20px' }}>
-        <div
-          onClick={() => todayWorkout ? onStartWorkout(todayWorkout.id) : onNavigate('workout')}
-          style={{ borderRadius: 26, overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
-        >
-          {todayWorkout && (
-            <img
-              src={getWorkoutImage(todayWorkout)}
-              alt={todayWorkout.title}
-              style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }}
-            />
-          )}
-          {!todayWorkout && <div style={{ width: '100%', height: 200, background: T.bg3 }} />}
-
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(7,7,10,0.95) 0%, rgba(7,7,10,0.3) 60%, transparent 100%)' }} />
-
-          <div style={{ position: 'absolute', inset: 0, padding: '20px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: accent, animation: 'pulse 2s ease-in-out infinite' }} />
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted2 }}>CONSIGLIATO OGGI</span>
-              </div>
-              <div style={{ fontFamily: T.display, fontSize: 34, color: T.text, lineHeight: 0.95 }}>
-                {todayWorkout ? todayWorkout.title.toUpperCase() : 'SCEGLI\nALLENAMENTO'}
-              </div>
-              {todayWorkout && (
-                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, background: `${accent}15`, border: `1px solid ${accent}25`, borderRadius: 100, padding: '4px 10px' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: accent }}>{todayWorkout.category}</span>
-                  <span style={{ fontSize: 10, color: T.muted }}> · {todayWorkout.exercises.length} esercizi</span>
-                </div>
-              )}
-            </div>
-
-            <button
-              style={{ width: 48, height: 48, borderRadius: 16, background: accent, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end', boxShadow: `0 4px 20px ${glow}` }}
-              onClick={e => { e.stopPropagation(); todayWorkout ? onStartWorkout(todayWorkout.id) : onNavigate('workout'); }}
-            >
-              <Play size={22} fill="#000" style={{ color: '#000', marginLeft: 2 }} />
-            </button>
-          </div>
-
-          {/* Exercise pills */}
-          {todayWorkout && (
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 16px 14px', display: 'flex', gap: 8, overflowX: 'auto' }}>
-              {todayWorkout.exercises.slice(0, 4).map((ex, i) => (
-                <div key={i} style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 100, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', fontSize: 10, fontWeight: 600, color: T.muted2, whiteSpace: 'nowrap' }}>
-                  {ex.name}
-                </div>
-              ))}
-              {todayWorkout.exercises.length > 4 && (
-                <div style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 100, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', fontSize: 10, color: T.muted }}>
-                  +{todayWorkout.exercises.length - 4}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* STATS ROW ──────────────────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', zIndex: 1, padding: '0 20px 20px' }}>
-        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 12 }}>LE TUE STATISTICHE</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+      {/* STATS */}
+      <div className="px-5 mb-5">
+        <div className="grid grid-cols-3 gap-2.5">
           {[
-            { icon: '🔥', value: userStats.streak, label: 'Streak',  color: T.amber },
-            { icon: '🏋️', value: userStats.workoutsCompleted, label: 'Workout', color: accent },
-            { icon: '⚡', value: `${Math.floor(userStats.activeMinutes / 60)}h`, label: 'Attivo', color: T.sky },
-          ].map(({ icon, value, label, color }) => (
-            <div key={label} style={{ ...card, padding: '14px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: `${color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{icon}</div>
-              <div style={{ fontFamily: T.display, fontSize: 30, color, lineHeight: 1 }}>{value}</div>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>{label}</div>
+            { icon: <Flame size={14} fill="currentColor" className="text-orange-400" />, val: userStats.streak, lbl: 'Streak', bg: '#f9731610' },
+            { icon: <Dumbbell size={14} className={accent} />, val: userStats.workoutsCompleted, lbl: 'Workout', bg: `${accentHex}10` },
+            { icon: <Activity size={14} className="text-sky-400" />, val: `${Math.floor(userStats.activeMinutes / 60)}h`, lbl: 'Attivo', bg: '#0ea5e910' },
+          ].map(({ icon, val, lbl, bg }) => (
+            <div key={lbl} className={`${theme.card} border rounded-2xl p-3.5 flex flex-col items-center gap-1.5`}>
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ backgroundColor: bg }}>{icon}</div>
+              <span className={`text-lg font-black ${theme.text} leading-none`}>{val}</span>
+              <span className={`text-[9px] font-bold uppercase tracking-wider ${theme.label}`}>{lbl}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* QUICK ACTIONS ──────────────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', zIndex: 1, padding: '0 20px 20px' }}>
-        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 12 }}>AZIONI RAPIDE</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-          {QUICK_ACTIONS.map(({ label, icon: Icon, screen, color }) => (
-            <button
-              key={screen}
-              onClick={() => onNavigate(screen)}
-              style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '14px 8px', cursor: 'pointer', border: `1px solid ${T.border}`, transition: 'transform 0.15s' }}
-              onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.9)')}
-              onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
-            >
-              <div style={{ width: 36, height: 36, borderRadius: 11, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={18} style={{ color }} />
+      {/* TODAY WORKOUT CARD */}
+      <div className="px-5 mb-5">
+        <div id="card-next-workout" className="relative overflow-hidden rounded-3xl border border-zinc-800/50" style={{ background: `linear-gradient(135deg, #111 0%, ${accentHex}12 100%)` }}>
+          <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full opacity-30 blur-2xl" style={{ backgroundColor: accentHex }} />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentHex }} />
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${theme.textMuted}`}>Consigliato Oggi</span>
+                </div>
+                <h2 className={`text-xl font-black ${theme.text} leading-tight`}>
+                  {todayWorkout ? todayWorkout.title : 'Scegli allenamento'}
+                </h2>
+                {todayWorkout && <p className={`${theme.textSub} text-xs mt-1`}>{todayWorkout.category} · {todayWorkout.exercises.length} esercizi</p>}
               </div>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: T.muted2, textAlign: 'center', lineHeight: 1.3, whiteSpace: 'pre' }}>{label}</span>
+              <button id="action-workout-main"
+                onClick={() => todayWorkout ? onStartWorkout(todayWorkout.id) : onNavigate('workout')}
+                className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 active:scale-90 transition-transform shadow-lg" style={{ backgroundColor: accentHex }}>
+                <Play size={20} fill="black" className="text-black ml-0.5" />
+              </button>
+            </div>
+            {todayWorkout && (
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                {todayWorkout.exercises.slice(0, 4).map((ex, i) => (
+                  <div key={i} className="shrink-0 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                    <p className="text-white text-[10px] font-medium whitespace-nowrap">{ex.name}</p>
+                  </div>
+                ))}
+                {todayWorkout.exercises.length > 4 && (
+                  <div className="shrink-0 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                    <p className="text-zinc-500 text-[10px] font-medium">+{todayWorkout.exercises.length - 4}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div className="px-5 mb-5">
+        <p className={`text-[9px] font-bold uppercase tracking-widest ${theme.label} mb-3`}>Azioni Rapide</p>
+        <div className="grid grid-cols-4 gap-2.5">
+          {QUICK_ACTIONS.map(({ label, icon: Icon, screen, color }) => (
+            <button key={screen} onClick={() => onNavigate(screen)}
+              className={`flex flex-col items-center gap-2 p-3 rounded-2xl ${theme.card} border active:scale-90 transition-transform`}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}18` }}>
+                <Icon size={16} style={{ color }} />
+              </div>
+              <span className={`text-[9px] font-bold ${theme.textSub} text-center leading-tight`}>{label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* WORKOUT LIBRARY ────────────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', zIndex: 1, padding: '0 20px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>LIBRERIA SCHEDE</div>
-          <button onClick={() => onNavigate('workout')} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: accent, background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            VEDI TUTTO <ArrowUpRight size={10} />
+      {/* WORKOUT LIBRARY */}
+      <div className="px-5 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className={`text-[9px] font-bold uppercase tracking-widest ${theme.label}`}>Libreria Schede</p>
+          <button onClick={() => onNavigate('workout')} className="flex items-center gap-1 text-[10px] font-bold" style={{ color: accentHex }}>
+            Vedi tutto <ArrowUpRight size={10} />
           </button>
         </div>
-        <div style={{ ...card, overflow: 'hidden' }}>
-          {availableWorkouts.slice(0, 3).map((w, i) => (
-            <React.Fragment key={w.id}>
-              <div
-                onClick={() => onStartWorkout(w.id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', cursor: 'pointer' }}
-              >
-                <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', flexShrink: 0 }}>
-                  <img src={getWorkoutImage(w)} alt={w.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.title}</div>
-                  <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>
-                    <span style={{ color: CAT_COLORS[w.category] || accent, fontWeight: 700 }}>{w.category}</span>
-                    {` · ${w.exercises.length} esercizi`}
-                  </div>
-                </div>
-                {w.isCustom && <span style={{ fontSize: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '3px 6px', borderRadius: 6, color: T.violet, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', flexShrink: 0 }}>Custom</span>}
-                <ChevronRight size={14} style={{ color: T.muted, flexShrink: 0 }} />
+        <div className="space-y-2">
+          {availableWorkouts.slice(0, 3).map(w => {
+            const catColors: Record<string, string> = {
+              'Massa': '#10b981', 'Definizione': '#8b5cf6',
+              'Perdita Peso': '#f97316', 'Resistenza': '#3b82f6', 'Custom': '#a855f7'
+            };
+            const catColor = catColors[w.category] || accentHex;
+            return (
+            <div key={w.id} onClick={() => onStartWorkout(w.id)}
+              className={`flex items-center gap-3.5 p-3 rounded-2xl ${theme.card} border cursor-pointer active:scale-[0.98] transition-transform overflow-hidden`}>
+              {/* Image thumbnail */}
+              <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 relative">
+                <img src={getWorkoutImage(w)} alt={w.title} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
               </div>
-              {i < Math.min(availableWorkouts.length - 1, 2) && <div style={{ height: 1, background: T.border, margin: '0 16px' }} />}
-            </React.Fragment>
-          ))}
-          {availableWorkouts.length === 0 && (
-            <div style={{ padding: '24px', textAlign: 'center', color: T.muted, fontSize: 13 }}>
-              Nessuna scheda disponibile.<br />
-              <button onClick={() => onNavigate('custom-workout-builder')} style={{ color: accent, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', marginTop: 8 }}>Crea la tua prima scheda →</button>
+              <div className="flex-1 min-w-0">
+                <p className={`${theme.text} font-bold text-sm truncate`}>{w.title}</p>
+                <p className={`${theme.textSub} text-xs mt-0.5`}>
+                  <span style={{ color: catColor }} className="font-semibold">{w.category}</span>
+                  {' · '}{w.exercises.length} esercizi
+                </p>
+              </div>
+              {w.isCustom && <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-md text-purple-400 bg-purple-500/10 border border-purple-500/20 shrink-0">Custom</span>}
+              <ChevronRight size={14} className={`${theme.textMuted} shrink-0`} />
             </div>
-          )}
+            );
+          })}
         </div>
       </div>
 
-      {/* NUTRITION ──────────────────────────────────────────────────────────── */}
-      {userProfile.weight > 0 && (
-        <div style={{ position: 'relative', zIndex: 1, padding: '0 20px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>PIANO NUTRIZIONALE</div>
-            <button onClick={() => onNavigate('nutrizione' as ScreenName)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: accent, background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              DETTAGLI <ArrowUpRight size={10} />
-            </button>
-          </div>
-          <div onClick={() => onNavigate('nutrizione' as ScreenName)} style={{ ...card, overflow: 'hidden', cursor: 'pointer' }}>
-            <div style={{ padding: '18px 18px 14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 4 }}>Fabbisogno Giornaliero</div>
-                <div>
-                  <span style={{ fontFamily: T.display, fontSize: 48, color: accent, lineHeight: 1 }}>{kcal}</span>
-                  <span style={{ fontSize: 13, color: T.muted, fontWeight: 500, marginLeft: 6 }}>kcal / giorno</span>
+      {/* NUTRIZIONE */}
+      {userProfile.weight > 0 && (() => {
+        const goal   = userProfile.goal || 'muscle';
+        const weight = userProfile.weight;
+        const mult: Record<string, { kcal: number; protein: number; carbs: number; fat: number }> = {
+          muscle:      { kcal: 36,  protein: 2.2, carbs: 4.5, fat: 1.0 },
+          definition:  { kcal: 29,  protein: 2.4, carbs: 2.5, fat: 0.9 },
+          weight_loss: { kcal: 24,  protein: 2.0, carbs: 2.0, fat: 0.7 },
+          endurance:   { kcal: 33,  protein: 1.6, carbs: 5.5, fat: 0.8 },
+        };
+        const m = mult[goal] || mult.muscle;
+        const kcal    = Math.round(weight * m.kcal);
+        const protein = Math.round(weight * m.protein);
+        const carbs   = Math.round(weight * m.carbs);
+        const fat     = Math.round(weight * m.fat);
+        return (
+          <div className="px-5 mb-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className={`text-[9px] font-bold uppercase tracking-widest ${theme.label}`}>Piano Nutrizionale</p>
+              <button onClick={() => onNavigate('nutrizione' as ScreenName)} className="flex items-center gap-1 text-[10px] font-bold" style={{ color: accentHex }}>
+                Dettagli <ArrowUpRight size={10} />
+              </button>
+            </div>
+            <button
+              onClick={() => onNavigate('nutrizione' as ScreenName)}
+              className={`w-full ${theme.card} border rounded-3xl overflow-hidden active:scale-[0.98] transition-transform`}
+            >
+              {/* Kcal hero row */}
+              <div className="flex items-center justify-between p-4 pb-3">
+                <div className="text-left">
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.label}`}>Fabbisogno Giornaliero</p>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-3xl font-black" style={{ color: accentHex }}>{kcal}</span>
+                    <span className={`text-xs font-medium ${theme.textSub}`}>kcal / giorno</span>
+                  </div>
+                </div>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${accentHex}15` }}>
+                  <Flame size={22} style={{ color: accentHex }} />
                 </div>
               </div>
-              <div style={{ width: 48, height: 48, borderRadius: 16, background: `${accent}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🔥</div>
-            </div>
-            <div style={{ display: 'flex', borderTop: `1px solid ${T.border}` }}>
-              {[
-                { label: 'Proteine', value: protein, unit: 'g', icon: '🥩', color: T.lime },
-                { label: 'Carboidrati', value: carbs, unit: 'g', icon: '🌾', color: T.violet },
-                { label: 'Grassi', value: fat, unit: 'g', icon: '🫒', color: T.amber },
-              ].map(({ label, value, unit, icon, color }, i) => (
-                <div key={label} style={{ flex: 1, padding: '12px 8px', textAlign: 'center', borderRight: i < 2 ? `1px solid ${T.border}` : 'none' }}>
-                  <div style={{ fontSize: 14, marginBottom: 4 }}>{icon}</div>
-                  <div style={{ fontFamily: T.display, fontSize: 22, color: T.text, lineHeight: 1 }}>{value}<span style={{ fontSize: 9, color: T.muted }}>{unit}</span></div>
-                  <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.muted, marginTop: 2 }}>{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 1RM MAXES ──────────────────────────────────────────────────────────── */}
-      {(userStats.maxes?.bench || userStats.maxes?.squat || userStats.maxes?.deadlift) && (
-        <div style={{ position: 'relative', zIndex: 1, padding: '0 20px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>MASSIMALI 1RM</div>
-            <button onClick={() => onNavigate('profile')} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: accent, background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              MODIFICA <ArrowUpRight size={10} />
+              {/* Macros strip */}
+              <div className="flex border-t divide-x" style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                {[
+                  { label: 'Proteine', value: protein, unit: 'g', color: '#10b981', Icon: Beef },
+                  { label: 'Carbo', value: carbs, unit: 'g', color: '#6366f1', Icon: Wheat },
+                  { label: 'Grassi', value: fat, unit: 'g', color: '#f59e0b', Icon: Zap },
+                ].map(({ label, value, unit, color, Icon }) => (
+                  <div key={label} className="flex-1 px-3 py-3 text-center" style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                    <Icon size={14} className="mx-auto mb-1" style={{ color }} />
+                    <p className="font-black text-sm" style={{ color: isDarkMode ? '#fff' : '#111' }}>{value}<span className={`text-[9px] font-medium ml-0.5 ${theme.label}`}>{unit}</span></p>
+                    <p className={`text-[9px] font-bold uppercase ${theme.label} mt-0.5`}>{label}</p>
+                  </div>
+                ))}
+              </div>
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {[
-              { label: 'Panca', emoji: '🏋️', value: userStats.maxes?.bench },
-              { label: 'Squat', emoji: '🦵', value: userStats.maxes?.squat },
-              { label: 'Stacco', emoji: '⚡', value: userStats.maxes?.deadlift },
-            ].map(({ label, emoji, value }) => (
-              <div key={label} style={{ ...card, padding: '16px 10px', textAlign: 'center' }}>
-                <div style={{ fontSize: 20 }}>{emoji}</div>
-                <div style={{ fontFamily: T.display, fontSize: 30, color: T.text, lineHeight: 1, marginTop: 4 }}>
-                  {value || 0}<span style={{ fontSize: 9, color: T.muted, marginLeft: 2 }}>kg</span>
-                </div>
-                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginTop: 4 }}>{label}</div>
+        );
+      })()}
+
+      {/* MASSIMALI */}
+      {(userStats.maxes?.bench || userStats.maxes?.squat || userStats.maxes?.deadlift) ? (
+        <div className="px-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className={`text-[9px] font-bold uppercase tracking-widest ${theme.label}`}>Massimali 1RM</p>
+            <button onClick={() => onNavigate('profile')} className="flex items-center gap-1 text-[10px] font-bold" style={{ color: accentHex }}>
+              Modifica <ArrowUpRight size={10} />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
+            {[{lbl:'Panca',em:'🏋️',val:userStats.maxes?.bench},{lbl:'Squat',em:'🦵',val:userStats.maxes?.squat},{lbl:'Stacco',em:'⚡',val:userStats.maxes?.deadlift}].map(({lbl,em,val})=>(
+              <div key={lbl} className={`${theme.card} border rounded-2xl p-3 text-center`}>
+                <span className="text-lg">{em}</span>
+                <p className={`${theme.text} font-black text-base mt-1`}>{val||0}<span className={`${theme.label} text-[9px] ml-0.5`}>kg</span></p>
+                <p className={`text-[9px] ${theme.label} font-bold uppercase`}>{lbl}</p>
               </div>
             ))}
           </div>
         </div>
-      )}
-
-      <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.7)} }`}</style>
+      ) : null}
     </div>
   );
 };

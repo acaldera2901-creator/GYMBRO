@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { ArrowRight, ChevronLeft, Dumbbell, Flame, Activity, Zap, Building2, Home, Sparkles } from 'lucide-react';
+import { ChevronLeft, Dumbbell, Flame, Activity, Zap, ArrowRight, Target, Home, Building2, Sparkles, TrendingUp, Clock } from 'lucide-react';
 
 interface GoalSelectionScreenProps {
   onFinish: (goal: string, experience?: string, equipment?: string, frequency?: number) => void;
@@ -8,52 +7,34 @@ interface GoalSelectionScreenProps {
 
 type Step = 'goal' | 'experience' | 'equipment' | 'frequency';
 
-const T = {
-  bg: '#07070A', bg2: '#0F0F14', bg3: '#16161D',
-  border: 'rgba(255,255,255,0.07)', border2: 'rgba(255,255,255,0.12)',
-  lime: '#C8FF00', coral: '#FF5D3B', amber: '#FFB347', violet: '#A78BFA', sky: '#38BDF8',
-  muted: '#6B6B80', muted2: '#8E8EA0', text: '#F0F0F5',
-  display: "'Bebas Neue', sans-serif", body: "'DM Sans', sans-serif",
-};
-
-const GOALS = [
-  { id: 'muscle',      title: 'Ipertrofia',   sub: 'Massimizza volume e forza muscolare.',     icon: Dumbbell, color: '#C8FF00', tag: 'Più popolare', emoji: '💪' },
-  { id: 'definition',  title: 'Definizione',  sub: 'Scolpisci i dettagli, mantieni la massa.', icon: Zap,      color: '#A78BFA', tag: null,           emoji: '⚡' },
-  { id: 'weight_loss', title: 'Perdita Peso', sub: 'Brucia calorie ad alta intensità.',        icon: Flame,    color: '#FF5D3B', tag: null,           emoji: '🔥' },
-  { id: 'endurance',   title: 'Resistenza',   sub: 'Migliora fiato e stamina cardio.',         icon: Activity, color: '#38BDF8', tag: null,           emoji: '🏃' },
-];
-
-const EXPERIENCES = [
-  { id: 'beginner',     emoji: '🌱', title: 'Principiante',  sub: 'Meno di 1 anno di allenamento',        detail: 'Piano graduale con progressioni sicure' },
-  { id: 'intermediate', emoji: '💪', title: 'Intermedio',    sub: '1–3 anni di allenamento costante',     detail: 'Periodizzazione e volumi moderati' },
-  { id: 'advanced',     emoji: '⚡', title: 'Avanzato',      sub: '3+ anni, conosco tecniche avanzate',   detail: 'Volume elevato, tecniche speciali' },
-];
-
-const EQUIPMENTS = [
-  { id: 'full_gym',   emoji: '🏢', title: 'Palestra Completa', sub: 'Bilancieri, macchine, cavi',            icon: Building2, color: '#C8FF00' },
-  { id: 'home_gym',   emoji: '🏠', title: 'Home Gym',          sub: 'Manubri, barra, spazio limitato',       icon: Home,      color: '#A78BFA' },
-  { id: 'bodyweight', emoji: '🤸', title: 'Solo Corpo Libero', sub: 'Nessun attrezzo, ovunque',              icon: Sparkles,  color: '#38BDF8' },
-];
-
-const FREQ_PLANS: Record<number, { label: string; desc: string }> = {
-  2: { label: 'Full Body × 2', desc: 'Riposo abbondante, ideale per iniziare' },
-  3: { label: 'Push / Pull / Legs', desc: 'Split classico, ottimo equilibrio' },
-  4: { label: 'Upper / Lower × 2', desc: 'Alta frequenza per ogni muscolo' },
-  5: { label: '5-Day Split', desc: 'Un muscolo al giorno, massimo volume' },
-  6: { label: '6-Day PPL', desc: 'Push Pull Legs × 2, livello elite' },
-};
-
-const STEPS: Step[] = ['goal', 'experience', 'equipment', 'frequency'];
-
 const GoalSelectionScreen: React.FC<GoalSelectionScreenProps> = ({ onFinish }) => {
   const [step, setStep] = useState<Step>('goal');
-  const [selectedGoal, setSelectedGoal]   = useState('muscle');
-  const [experience, setExperience]       = useState('intermediate');
-  const [equipment, setEquipment]         = useState('full_gym');
-  const [frequency, setFrequency]         = useState(4);
+  const [selectedGoal, setSelectedGoal] = useState('muscle');
+  const [experience, setExperience] = useState('intermediate');
+  const [equipment, setEquipment] = useState('full_gym');
+  const [frequency, setFrequency] = useState(4);
 
-  const stepIdx = STEPS.indexOf(step);
-  const progress = ((stepIdx + 1) / STEPS.length) * 100;
+  const steps: Step[] = ['goal', 'experience', 'equipment', 'frequency'];
+  const stepIndex = steps.indexOf(step);
+
+  const goals = [
+    { id: 'muscle',      title: 'Ipertrofia',     desc: 'Massimizza volume e forza muscolare.',     icon: Dumbbell, tag: 'Più popolare' },
+    { id: 'definition',  title: 'Definizione',    desc: 'Scolpisci i dettagli, mantieni i muscoli.', icon: Zap,      tag: null },
+    { id: 'weight_loss', title: 'Perdita Peso',   desc: 'Brucia calorie ad alta intensità.',         icon: Flame,    tag: null },
+    { id: 'endurance',   title: 'Resistenza',     desc: 'Migliora fiato e stamina.',                 icon: Activity, tag: null },
+  ];
+
+  const experiences = [
+    { id: 'beginner',     title: 'Principiante',  desc: 'Meno di 1 anno di allenamento',         emoji: '🌱', detail: 'Piano su misura, progressioni graduali' },
+    { id: 'intermediate', title: 'Intermedio',    desc: '1–3 anni di allenamento costante',      emoji: '💪', detail: 'Periodizzazione e intensità moderate' },
+    { id: 'advanced',     title: 'Avanzato',      desc: '3+ anni, conosco le tecniche avanzate', emoji: '⚡', detail: 'Volume elevato, tecniche speciali' },
+  ];
+
+  const equipments = [
+    { id: 'full_gym',   title: 'Palestra Completa', desc: 'Bilancieri, macchine, cavi, tutto',    icon: Building2, color: '#10b981' },
+    { id: 'home_gym',   title: 'Home Gym',          desc: 'Manubri, barra, panca, spazio limitato', icon: Home,   color: '#6366f1' },
+    { id: 'bodyweight', title: 'Solo Corpo Libero', desc: 'Senza attrezzi, ovunque',               icon: Sparkles, color: '#f59e0b' },
+  ];
 
   const handleNext = () => {
     if (step === 'goal')       setStep('experience');
@@ -68,209 +49,186 @@ const GoalSelectionScreen: React.FC<GoalSelectionScreenProps> = ({ onFinish }) =
     else if (step === 'frequency') setStep('equipment');
   };
 
-  const titles: Record<Step, { display: string; sub: string; cta: string }> = {
-    goal:       { display: 'IL TUO\nOBIETTIVO',  sub: "L'algoritmo calibrerà intensità e volume.", cta: 'CONTINUA' },
-    experience: { display: 'IL TUO\nLIVELLO',    sub: 'Adattiamo il piano al tuo punto di partenza.', cta: 'CONTINUA' },
-    equipment:  { display: 'LA TUA\nATTREZZATURA', sub: 'Gli esercizi saranno adattati a ciò che hai.', cta: 'CONTINUA' },
-    frequency:  { display: 'LA TUA\nFREQUENZA',  sub: 'Quante volte a settimana vuoi allenarti?', cta: 'GENERA IL PIANO' },
+  const progressW = ((stepIndex + 1) / steps.length) * 100;
+
+  const renderGoal = () => (
+    <div className="space-y-3">
+      {goals.map((goal) => {
+        const isSelected = selectedGoal === goal.id;
+        const Icon = goal.icon;
+        return (
+          <div key={goal.id} onClick={() => setSelectedGoal(goal.id)}
+            className={`p-5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${
+              isSelected ? 'bg-emerald-500 border-emerald-400' : 'bg-[#121212] border-slate-800 hover:border-slate-600'
+            }`}>
+            {goal.tag && (
+              <span className={`absolute top-3 right-3 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${isSelected ? 'bg-black/20 text-black' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                {goal.tag}
+              </span>
+            )}
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isSelected ? 'bg-black/20 text-black' : 'bg-slate-800/50 text-slate-400'}`}>
+                <Icon size={22} />
+              </div>
+              <div>
+                <h3 className={`font-black text-base ${isSelected ? 'text-black' : 'text-white'}`}>{goal.title}</h3>
+                <p className={`text-xs mt-0.5 ${isSelected ? 'text-black/70' : 'text-slate-500'}`}>{goal.desc}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderExperience = () => (
+    <div className="space-y-3">
+      {experiences.map((ex) => {
+        const isSelected = experience === ex.id;
+        return (
+          <div key={ex.id} onClick={() => setExperience(ex.id)}
+            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
+              isSelected ? 'bg-[#1a1a1a] border-emerald-500' : 'bg-[#121212] border-slate-800 hover:border-slate-600'
+            }`}>
+            <div className="flex items-start gap-4">
+              <span className="text-2xl mt-0.5">{ex.emoji}</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-black text-white text-base">{ex.title}</h3>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-emerald-500' : 'border-slate-600'}`}>
+                    {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />}
+                  </div>
+                </div>
+                <p className="text-slate-500 text-xs mt-0.5">{ex.desc}</p>
+                {isSelected && (
+                  <p className="text-emerald-400 text-[11px] mt-2 font-medium">✓ {ex.detail}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderEquipment = () => (
+    <div className="space-y-3">
+      {equipments.map((eq) => {
+        const isSelected = equipment === eq.id;
+        const Icon = eq.icon;
+        return (
+          <div key={eq.id} onClick={() => setEquipment(eq.id)}
+            className={`p-5 rounded-2xl border transition-all cursor-pointer ${
+              isSelected ? 'bg-[#1a1a1a] border-emerald-500' : 'bg-[#121212] border-slate-800 hover:border-slate-600'
+            }`}>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: isSelected ? `${eq.color}20` : '#1f1f1f' }}>
+                <Icon size={22} style={{ color: isSelected ? eq.color : '#6b7280' }} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-white text-base">{eq.title}</h3>
+                <p className="text-slate-500 text-xs mt-0.5">{eq.desc}</p>
+              </div>
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-emerald-500' : 'border-slate-600'}`}>
+                {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderFrequency = () => (
+    <div>
+      <div className="bg-[#121212] border border-slate-800 rounded-2xl p-6 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p className="text-slate-500 text-xs uppercase tracking-widest font-bold mb-1">Giorni a settimana</p>
+            <p className="text-6xl font-black text-white">{frequency}</p>
+          </div>
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+            <Clock size={28} className="text-emerald-400" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {[2,3,4,5,6].map(n => (
+            <button key={n} onClick={() => setFrequency(n)}
+              className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${
+                frequency === n ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+              }`}>
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Preview del piano */}
+      <div className="space-y-2">
+        {[
+          { days: 2, label: 'Full Body × 2', rest: 'Riposo abbondante, ideale per principianti' },
+          { days: 3, label: 'Push / Pull / Legs', rest: 'Split classico, ottimo equilibrio' },
+          { days: 4, label: 'Upper / Lower × 2', rest: 'Alta frequenza per muscolo' },
+          { days: 5, label: '5-Day Split', rest: 'Un muscolo al giorno, massimo volume' },
+          { days: 6, label: '6-Day PPL', rest: 'Push Pull Legs × 2, elite' },
+        ].filter(p => p.days === frequency).map(plan => (
+          <div key={plan.days} className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+            <p className="text-emerald-400 font-bold text-sm">📋 {plan.label}</p>
+            <p className="text-slate-400 text-xs mt-1">{plan.rest}</p>
+          </div>
+        ))}
+        <div className="bg-[#121212] border border-slate-800 rounded-xl p-4">
+          <p className="text-slate-500 text-xs leading-relaxed">
+            💡 Potrai sempre modificare i giorni dal profilo dopo il setup.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const titles: Record<Step, { step: string; title: string; sub: string }> = {
+    goal:       { step: 'Step 1 di 4', title: 'Il tuo Obiettivo',  sub: "L'algoritmo calibrerà intensità e volume." },
+    experience: { step: 'Step 2 di 4', title: 'La tua Esperienza', sub: 'Adaptiamo il piano al tuo livello attuale.' },
+    equipment:  { step: 'Step 3 di 4', title: 'La tua Attrezzatura', sub: 'Gli esercizi saranno adattati a quello che hai.' },
+    frequency:  { step: 'Step 4 di 4', title: 'Quante volte a settimana?', sub: 'Costruiamo la tua routine ideale.' },
   };
+
   const t = titles[step];
 
-  // ── SHARED SELECTION CARD ──────────────────────────────────────────────────
-  const SelectCard = ({
-    id, isSelected, onClick, children,
-    accentColor = T.lime,
-  }: { id: string; isSelected: boolean; onClick: () => void; children: React.ReactNode; accentColor?: string }) => (
-    <div
-      onClick={onClick}
-      style={{
-        background: isSelected ? `rgba(${accentColor === T.lime ? '200,255,0' : '167,139,250'},0.08)` : T.bg2,
-        border: `1px solid ${isSelected ? accentColor : T.border}`,
-        borderRadius: 20, padding: '18px 20px', cursor: 'pointer',
-        transition: 'all 0.2s',
-        boxShadow: isSelected ? `0 0 24px rgba(${accentColor === T.lime ? '200,255,0' : '167,139,250'},0.08)` : 'none',
-      }}
-    >
-      {children}
-    </div>
-  );
-
-  const RadioDot = ({ active, color = T.lime }: { active: boolean; color?: string }) => (
-    <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${active ? color : T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      {active && <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />}
-    </div>
-  );
-
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.body, display: 'flex', flexDirection: 'column' }}>
-
-      {/* HEADER */}
-      <div style={{ padding: '56px 24px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button
-          onClick={handleBack}
-          style={{
-            width: 40, height: 40, borderRadius: 14, background: T.bg2,
-            border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', cursor: 'pointer', color: T.text,
-            opacity: stepIdx === 0 ? 0 : 1, pointerEvents: stepIdx === 0 ? 'none' : 'auto',
-          }}
-        >
+    <div className="min-h-screen bg-black text-white flex flex-col">
+      {/* Header */}
+      <div className="px-6 pt-14 pb-4 flex items-center gap-3">
+        <button onClick={handleBack} className={`w-10 h-10 flex items-center justify-center rounded-full bg-[#121212] border border-slate-800 transition-all ${stepIndex === 0 ? 'opacity-0 pointer-events-none' : ''}`}>
           <ChevronLeft size={20} />
         </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ height: 3, background: T.bg3, borderRadius: 100, overflow: 'hidden', marginBottom: 6 }}>
-            <div style={{ height: '100%', background: T.lime, borderRadius: 100, width: `${progress}%`, transition: 'width 0.5s ease' }} />
+        <div className="flex-1">
+          {/* Progress bar */}
+          <div className="h-1 bg-slate-800 rounded-full mb-2">
+            <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${progressW}%` }} />
           </div>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>
-            STEP {stepIdx + 1} DI {STEPS.length}
-          </span>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t.step}</p>
         </div>
-        <div style={{ width: 40 }} />
+        <div className="w-10" />
       </div>
 
-      <div style={{ padding: '0 24px 8px' }}>
-        <h1 style={{ fontFamily: T.display, fontSize: 52, lineHeight: 0.9, color: T.text, whiteSpace: 'pre-line', marginBottom: 8 }}>
-          {t.display.split('\n').map((line, i) => (
-            <React.Fragment key={i}>
-              {i === 1 ? <span style={{ color: T.lime }}>{line}</span> : line}
-              {i === 0 && <br />}
-            </React.Fragment>
-          ))}
-        </h1>
-        <p style={{ fontSize: 13, color: T.muted2 }}>{t.sub}</p>
+      <div className="px-6 pb-6">
+        <h1 className="text-3xl font-black text-white mb-1">{t.title}</h1>
+        <p className="text-slate-400 text-sm">{t.sub}</p>
       </div>
 
-      {/* CONTENT */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 120px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-        {/* GOAL STEP */}
-        {step === 'goal' && GOALS.map(goal => {
-          const isSelected = selectedGoal === goal.id;
-          const Icon = goal.icon;
-          return (
-            <SelectCard key={goal.id} id={goal.id} isSelected={isSelected} onClick={() => setSelectedGoal(goal.id)} accentColor={goal.color}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, position: 'relative' }}>
-                {goal.tag && (
-                  <div style={{ position: 'absolute', top: -8, right: -4, background: `rgba(200,255,0,0.15)`, border: `1px solid rgba(200,255,0,0.3)`, borderRadius: 100, padding: '2px 8px', fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.lime }}>
-                    {goal.tag}
-                  </div>
-                )}
-                <div style={{ width: 52, height: 52, borderRadius: 16, background: `${goal.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={24} style={{ color: goal.color }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: isSelected ? goal.color : T.text }}>{goal.title}</div>
-                  <div style={{ fontSize: 12, color: T.muted2, marginTop: 2 }}>{goal.sub}</div>
-                </div>
-                <RadioDot active={isSelected} color={goal.color} />
-              </div>
-            </SelectCard>
-          );
-        })}
-
-        {/* EXPERIENCE STEP */}
-        {step === 'experience' && EXPERIENCES.map(ex => {
-          const isSelected = experience === ex.id;
-          return (
-            <SelectCard key={ex.id} id={ex.id} isSelected={isSelected} onClick={() => setExperience(ex.id)}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <span style={{ fontSize: 28 }}>{ex.emoji}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{ex.title}</div>
-                    <RadioDot active={isSelected} />
-                  </div>
-                  <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{ex.sub}</div>
-                  {isSelected && (
-                    <div style={{ marginTop: 8, fontSize: 11, color: T.lime, fontWeight: 600 }}>
-                      ✓ {ex.detail}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </SelectCard>
-          );
-        })}
-
-        {/* EQUIPMENT STEP */}
-        {step === 'equipment' && EQUIPMENTS.map(eq => {
-          const isSelected = equipment === eq.id;
-          const Icon = eq.icon;
-          return (
-            <SelectCard key={eq.id} id={eq.id} isSelected={isSelected} onClick={() => setEquipment(eq.id)} accentColor={eq.color}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ width: 52, height: 52, borderRadius: 16, background: `${eq.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={24} style={{ color: eq.color }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{eq.title}</div>
-                  <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{eq.sub}</div>
-                </div>
-                <RadioDot active={isSelected} color={eq.color} />
-              </div>
-            </SelectCard>
-          );
-        })}
-
-        {/* FREQUENCY STEP */}
-        {step === 'frequency' && (
-          <>
-            <div style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 22, padding: '20px 22px' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 4 }}>Giorni a settimana</div>
-                  <div style={{ fontFamily: T.display, fontSize: 72, color: T.lime, lineHeight: 1 }}>{frequency}</div>
-                </div>
-                <div style={{ width: 52, height: 52, borderRadius: 16, background: 'rgba(200,255,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>⏱️</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[2, 3, 4, 5, 6].map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setFrequency(n)}
-                    style={{
-                      flex: 1, padding: '12px 0', borderRadius: 12, border: `1px solid ${n === frequency ? T.lime : T.border}`,
-                      background: n === frequency ? `rgba(200,255,0,0.12)` : T.bg3,
-                      color: n === frequency ? T.lime : T.muted,
-                      fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: T.body,
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {FREQ_PLANS[frequency] && (
-              <div style={{ background: 'rgba(200,255,0,0.06)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: 16, padding: '14px 18px' }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: T.lime, marginBottom: 4 }}>📋 {FREQ_PLANS[frequency].label}</div>
-                <div style={{ fontSize: 12, color: T.muted2 }}>{FREQ_PLANS[frequency].desc}</div>
-              </div>
-            )}
-
-            <div style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 14, padding: '12px 16px' }}>
-              <div style={{ fontSize: 12, color: T.muted2, lineHeight: 1.5 }}>
-                💡 Potrai sempre modificare i giorni di allenamento dal tuo profilo.
-              </div>
-            </div>
-          </>
-        )}
+      <div className="flex-1 overflow-y-auto px-6 pb-32">
+        {step === 'goal'       && renderGoal()}
+        {step === 'experience' && renderExperience()}
+        {step === 'equipment'  && renderEquipment()}
+        {step === 'frequency'  && renderFrequency()}
       </div>
 
-      {/* CTA */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '20px 24px 36px', background: `linear-gradient(to top, ${T.bg} 70%, transparent)` }}>
-        <button
-          onClick={handleNext}
-          style={{
-            width: '100%', background: T.lime, color: '#000', border: 'none',
-            borderRadius: 16, padding: '17px', fontSize: 14, fontWeight: 800,
-            letterSpacing: '0.08em', cursor: 'pointer', fontFamily: T.body,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            boxShadow: '0 4px 24px rgba(200,255,0,0.25)',
-          }}
-        >
-          {t.cta} <ArrowRight size={20} strokeWidth={3} />
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black to-transparent z-10">
+        <button onClick={handleNext}
+          className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+          {step === 'frequency' ? 'GENERA IL MIO PIANO' : 'CONTINUA'}
+          <ArrowRight size={20} strokeWidth={3} />
         </button>
       </div>
     </div>

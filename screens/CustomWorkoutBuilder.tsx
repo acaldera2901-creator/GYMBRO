@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Plus, X, Check, Dumbbell, Zap, Edit3 } from 'lucide-react';
+import {
+  ChevronLeft, Plus, Check, Dumbbell, X,
+  Zap, ChevronDown, Edit3
+} from 'lucide-react';
 import { WorkoutCard, CategoryType } from '../types';
 
 interface CustomWorkoutBuilderProps {
@@ -7,346 +10,366 @@ interface CustomWorkoutBuilderProps {
   onSave: (workout: WorkoutCard) => void;
   isDarkMode: boolean;
   themeColor: string;
-  initialWorkout?: WorkoutCard | null;
+  initialWorkout?: WorkoutCard | null; // null = nuova, WorkoutCard = modifica
 }
 
-const T = {
-  bg: '#07070A', bg2: '#0F0F14', bg3: '#16161D', bg4: '#1E1E27',
-  border: 'rgba(255,255,255,0.07)', border2: 'rgba(255,255,255,0.12)',
-  lime: '#C8FF00', coral: '#FF5D3B', amber: '#FFB347', sky: '#38BDF8', violet: '#A78BFA',
-  muted: '#6B6B80', muted2: '#8E8EA0', text: '#F0F0F5',
-  display: "'Bebas Neue', sans-serif", body: "'DM Sans', sans-serif", mono: "'DM Mono', monospace",
+const CATEGORY_OPTIONS: { value: CategoryType; label: string; emoji: string; color: string }[] = [
+  { value: 'Massa',        label: 'Massa',          emoji: '💪', color: '#6366f1' },
+  { value: 'Definizione',  label: 'Definizione',    emoji: '⚡', color: '#f59e0b' },
+  { value: 'Perdita Peso', label: 'Perdita Peso',   emoji: '🔥', color: '#ef4444' },
+  { value: 'Resistenza',   label: 'Resistenza',     emoji: '🏃', color: '#06b6d4' },
+  { value: 'Custom',       label: 'Personalizzato', emoji: '✨', color: '#a855f7' },
+];
+
+const EXERCISE_SUGGESTIONS = [
+  'Panca Piana', 'Squat', 'Stacco da Terra', 'Military Press',
+  'Trazioni', 'Rematore', 'Curl Bilanciere', 'French Press',
+  'Leg Press', 'Affondi', 'Shoulder Press', 'Lat Machine',
+  'Croci Cavi', 'Hip Thrust', 'Leg Curl', 'Calf Raise',
+  'Panca Inclinata', 'Dip', 'Facepull', 'Shrug',
+];
+
+interface ExerciseEntry {
+  id: string;
+  name: string;
+  sets: string;
+  reps: string;
+  rest: string;
+}
+
+// Converte Exercise (WorkoutCard format) → ExerciseEntry (builder format)
+const parseExerciseFromCard = (ex: { name: string; reps?: string }, idx: number): ExerciseEntry => {
+  const repsStr = ex.reps ?? '3 x 10 (Rec. 60")';
+  const setsMatch = repsStr.match(/^(\d+)\s*[x×X]/i);
+  const repsMatch = repsStr.match(/[x×X]\s*(\d+)/i);
+  const restMatch = repsStr.match(/Rec[.\s]+(\d+)/i);
+  return {
+    id: `ex_${Date.now()}_${idx}`,
+    name: ex.name,
+    sets: setsMatch?.[1] ?? '3',
+    reps: repsMatch?.[1] ?? '10',
+    rest: restMatch?.[1] ?? '60',
+  };
 };
 
-const CATEGORIES: { value: CategoryType; label: string; emoji: string; color: string }[] = [
-  { value: 'Massa',        label: 'Massa',          emoji: '💪', color: '#C8FF00' },
-  { value: 'Definizione',  label: 'Definizione',    emoji: '⚡', color: '#A78BFA' },
-  { value: 'Perdita Peso', label: 'Perdita Peso',   emoji: '🔥', color: '#FF5D3B' },
-  { value: 'Resistenza',   label: 'Resistenza',     emoji: '🏃', color: '#38BDF8' },
-  { value: 'Custom',       label: 'Personalizzato', emoji: '✨', color: '#A855F7' },
-];
-
-const SUGGESTIONS = [
-  'Panca Piana','Squat','Stacco da Terra','Military Press','Trazioni','Rematore',
-  'Curl Bilanciere','French Press','Leg Press','Affondi','Shoulder Press',
-  'Lat Machine','Croci Cavi','Hip Thrust','Leg Curl','Calf Raise',
-  'Panca Inclinata','Dip','Facepull','Shrug',
-];
-
-interface ExEntry { id: string; name: string; sets: string; reps: string; rest: string; }
-
-type Step = 'info' | 'exercises' | 'review';
-
 const CustomWorkoutBuilder: React.FC<CustomWorkoutBuilderProps> = ({
-  onBack, onSave, isDarkMode, themeColor, initialWorkout,
+  onBack, onSave, isDarkMode, themeColor, initialWorkout
 }) => {
-  const isRose = themeColor === 'rose';
-  const accent = isRose ? T.coral : T.lime;
   const isEdit = Boolean(initialWorkout);
+  const isRose = themeColor === 'rose';
+  const accentHex = isRose ? '#f43f5e' : '#10b981';
+  const accentBg  = isRose ? 'bg-rose-500' : 'bg-emerald-500';
+  const accentText = isRose ? 'text-rose-400' : 'text-emerald-400';
 
-  const [step, setStep] = useState<Step>('info');
-  const [title, setTitle] = useState('');
-  const [focus, setFocus] = useState('');
+  const [step, setStep] = useState<'info' | 'exercises' | 'review'>('info');
+  const [title, setTitle]     = useState('');
+  const [focus, setFocus]     = useState('');
   const [category, setCategory] = useState<CategoryType>('Custom');
-  const [exercises, setExercises] = useState<ExEntry[]>([{ id: `ex_${Date.now()}`, name: '', sets: '3', reps: '10', rest: '60' }]);
-  const [showSug, setShowSug] = useState<string | null>(null);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [saved, setSaved] = useState(false);
+  const [exercises, setExercises] = useState<ExerciseEntry[]>([
+    { id: `ex_${Date.now()}`, name: '', sets: '3', reps: '10', rest: '60' }
+  ]);
+  const [showSuggestions, setShowSuggestions] = useState<string | null>(null);
+  const [errors, setErrors]   = useState<string[]>([]);
+  const [saved, setSaved]     = useState(false);
 
+  // Precompila se siamo in edit mode
   useEffect(() => {
     if (initialWorkout) {
       setTitle(initialWorkout.title);
       setFocus(initialWorkout.focus ?? '');
       setCategory(initialWorkout.category);
-      if (initialWorkout.exercises.length > 0) {
-        setExercises(initialWorkout.exercises.map((ex, i) => {
-          const r = ex.reps ?? '3 x 10';
-          const sm = r.match(/^(\d+)\s*[x×X]/i);
-          const rm = r.match(/[x×X]\s*(\d+)/i);
-          const rem = r.match(/Rec[.\s]+(\d+)/i);
-          return { id: `ex_${Date.now()}_${i}`, name: ex.name, sets: sm?.[1] ?? '3', reps: rm?.[1] ?? '10', rest: rem?.[1] ?? '60' };
-        }));
-      }
+      setExercises(
+        initialWorkout.exercises.length > 0
+          ? initialWorkout.exercises.map((ex, i) => parseExerciseFromCard(ex, i))
+          : [{ id: `ex_${Date.now()}`, name: '', sets: '3', reps: '10', rest: '60' }]
+      );
     }
   }, [initialWorkout]);
 
-  const addEx = () => {
-    if (exercises.length >= 12) return;
-    setExercises(p => [...p, { id: `ex_${Date.now()}`, name: '', sets: '3', reps: '10', rest: '60' }]);
+  const addExercise = () => {
+    setExercises(prev => [...prev, { id: `ex_${Date.now()}_${Math.random()}`, name: '', sets: '3', reps: '10', rest: '60' }]);
   };
-  const removeEx = (id: string) => {
+  const removeExercise = (id: string) => {
     if (exercises.length <= 1) return;
-    setExercises(p => p.filter(e => e.id !== id));
+    setExercises(prev => prev.filter(e => e.id !== id));
   };
-  const updateEx = (id: string, field: keyof ExEntry, val: string) =>
-    setExercises(p => p.map(e => e.id === id ? { ...e, [field]: val } : e));
+  const updateExercise = (id: string, field: keyof ExerciseEntry, value: string) => {
+    setExercises(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
+  };
 
-  const validate = (): boolean => {
+  const validateAndProceed = () => {
     const errs: string[] = [];
-    if (!title.trim()) errs.push('Inserisci un nome per la scheda.');
+    if (!title.trim()) errs.push('Inserisci un nome per la scheda');
     if (step === 'exercises') {
-      if (!exercises.some(e => e.name.trim())) errs.push('Aggiungi almeno un esercizio.');
-      if (exercises.some(e => !e.name.trim())) errs.push('Tutti gli esercizi devono avere un nome.');
+      if (exercises.filter(e => e.name.trim()).length === 0) errs.push('Aggiungi almeno un esercizio');
+      if (exercises.some(e => !e.name.trim())) errs.push('Tutti gli esercizi devono avere un nome');
     }
-    setErrors(errs);
-    return errs.length === 0;
-  };
-
-  const handleNext = () => {
-    if (!validate()) return;
+    if (errs.length > 0) { setErrors(errs); return; }
+    setErrors([]);
     if (step === 'info') setStep('exercises');
     else if (step === 'exercises') setStep('review');
   };
 
   const handleSave = () => {
     const workout: WorkoutCard = {
+      // In edit mode mantieni lo stesso ID, altrimenti genera nuovo
       id: isEdit && initialWorkout ? initialWorkout.id : `custom_${Date.now()}`,
-      category, title: title.trim(),
+      category,
+      title: title.trim(),
       focus: focus.trim() || 'Scheda personalizzata',
-      exercises: exercises.filter(e => e.name.trim()).map(e => ({
-        name: e.name.trim(), reps: `${e.sets} x ${e.reps} (Rec. ${e.rest}")`,
-      })),
-      isCustom: true, affinityScore: 100, image: initialWorkout?.image,
+      exercises: exercises
+        .filter(e => e.name.trim())
+        .map(e => ({
+          name: e.name.trim(),
+          reps: `${e.sets} x ${e.reps} (Rec. ${e.rest}")`,
+        })),
+      isCustom: true,
+      affinityScore: 100,
+      // Mantieni immagine se era già presente
+      image: initialWorkout?.image,
     };
     setSaved(true);
-    setTimeout(() => onSave(workout), 400);
+    setTimeout(() => onSave(workout), 500);
   };
 
-  const selCat = CATEGORIES.find(c => c.value === category) ?? CATEGORIES[4];
-  const STEPS: Step[] = ['info', 'exercises', 'review'];
-  const stepIdx = STEPS.indexOf(step);
-  const progress = ((stepIdx + 1) / STEPS.length) * 100;
+  const selectedCat = CATEGORY_OPTIONS.find(c => c.value === category) ?? CATEGORY_OPTIONS[4];
 
-  const card: React.CSSProperties = { background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 22 };
-
-  return (
-    <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.body, display: 'flex', flexDirection: 'column' }}>
-
-      {/* HEADER */}
-      <div style={{ padding: '52px 20px 0', borderBottom: `1px solid ${T.border}`, paddingBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <button onClick={onBack} style={{ width: 40, height: 40, borderRadius: 14, background: T.bg2, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.text }}>
-            <ChevronLeft size={20} />
-          </button>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontFamily: T.display, fontSize: 24, color: T.text }}>{isEdit ? 'MODIFICA SCHEDA' : 'CREA SCHEDA'}</span>
-              {isEdit && <Edit3 size={14} style={{ color: T.amber }} />}
+  // ── Step Indicator ────────────────────────────────────────────────────────
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center gap-2 mb-6">
+      {(['info', 'exercises', 'review'] as const).map((s, i) => {
+        const active = step === s;
+        const done = ['info', 'exercises', 'review'].indexOf(step) > i;
+        return (
+          <React.Fragment key={s}>
+            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-black transition-all ${
+              done ? `${accentBg} text-black` :
+              active ? 'bg-zinc-100 text-black scale-110' : 'bg-zinc-800 text-zinc-600'
+            }`}>
+              {done ? <Check size={12} strokeWidth={3} /> : i + 1}
             </div>
-            <div style={{ fontSize: 11, color: T.muted }}>
-              {step === 'info' ? 'Dettagli generali' : step === 'exercises' ? `${exercises.filter(e => e.name.trim()).length} esercizi` : 'Anteprima finale'}
-            </div>
-          </div>
-        </div>
+            {i < 2 && <div className="h-px w-8 transition-all" style={{ backgroundColor: done ? accentHex : '#27272a' }} />}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
 
-        {/* Progress */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ flex: 1, height: 3, background: T.bg3, borderRadius: 100, overflow: 'hidden' }}>
-            <div style={{ height: '100%', background: accent, width: `${progress}%`, borderRadius: 100, transition: 'width 0.5s ease' }} />
-          </div>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>STEP {stepIdx + 1} / 3</span>
-        </div>
-
-        {/* Step pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-          {STEPS.map((s, i) => {
-            const isDone = i < stepIdx;
-            const isActive = s === step;
-            return (
-              <React.Fragment key={s}>
-                <div style={{ width: 28, height: 28, borderRadius: 9, background: isDone ? accent : isActive ? T.bg3 : T.bg3, border: `1.5px solid ${isDone ? accent : isActive ? accent : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {isDone
-                    ? <Check size={13} style={{ color: '#000' }} strokeWidth={3} />
-                    : <span style={{ fontFamily: T.mono, fontSize: 11, color: isActive ? accent : T.muted }}>{i + 1}</span>}
-                </div>
-                {i < 2 && <div style={{ flex: 1, height: 1.5, background: isDone ? accent : T.border, borderRadius: 100, transition: 'background 0.3s' }} />}
-              </React.Fragment>
-            );
-          })}
+  // ── Step 1: Info ───────────────────────────────────────────────────────────
+  const renderInfo = () => (
+    <div className="space-y-5">
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-2">Nome Scheda *</label>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="es. Push Day, Gambe Esplosive..."
+          className="w-full bg-zinc-900 text-white rounded-2xl py-4 px-4 border border-zinc-800 focus:border-zinc-600 outline-none transition-all font-medium placeholder-zinc-700"
+        />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-2">Focus / Descrizione</label>
+        <input
+          value={focus}
+          onChange={e => setFocus(e.target.value)}
+          placeholder="es. Ipertrofia e forza massima"
+          className="w-full bg-zinc-900 text-white rounded-2xl py-4 px-4 border border-zinc-800 focus:border-zinc-600 outline-none transition-all font-medium placeholder-zinc-700"
+        />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-3">Categoria</label>
+        <div className="grid grid-cols-2 gap-2">
+          {CATEGORY_OPTIONS.map(cat => (
+            <button
+              key={cat.value}
+              onClick={() => setCategory(cat.value)}
+              className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
+                category === cat.value ? 'border-zinc-500 bg-zinc-800' : 'border-zinc-800 bg-zinc-900/60'
+              }`}
+            >
+              <span className="text-xl">{cat.emoji}</span>
+              <div>
+                <p className="text-white text-xs font-bold">{cat.label}</p>
+                {category === cat.value && <p className="text-[9px] mt-0.5" style={{ color: cat.color }}>Selezionato</p>}
+              </div>
+            </button>
+          ))}
         </div>
       </div>
+    </div>
+  );
 
-      {/* CONTENT */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 120px' }}>
-
-        {/* Errors */}
-        {errors.length > 0 && (
-          <div style={{ background: 'rgba(255,93,59,0.08)', border: '1px solid rgba(255,93,59,0.2)', borderRadius: 14, padding: '12px 16px', marginBottom: 16 }}>
-            {errors.map((e, i) => <div key={i} style={{ fontSize: 12, color: T.coral }}>{e}</div>)}
-          </div>
-        )}
-
-        {/* ── STEP 1: INFO ────────────────────────────────────────────── */}
-        {step === 'info' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 8 }}>NOME SCHEDA *</div>
+  // ── Step 2: Esercizi ───────────────────────────────────────────────────────
+  const renderExercises = () => (
+    <div className="space-y-3">
+      <p className="text-zinc-500 text-xs mb-4">Aggiungi gli esercizi della tua scheda. Puoi ordinarne fino a 12.</p>
+      {exercises.map((ex, idx) => (
+        <div key={ex.id} className="bg-zinc-900/80 rounded-2xl border border-zinc-800 overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/60">
+            <div className="w-6 h-6 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
+              <span className="text-[10px] font-black text-zinc-500">{idx + 1}</span>
+            </div>
+            <div className="flex-1 relative">
               <input
-                value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="es. Push Day, Gambe Esplosive..."
-                style={{ width: '100%', background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 14, padding: '16px', color: T.text, fontSize: 15, fontWeight: 500, outline: 'none', fontFamily: T.body, boxSizing: 'border-box' }}
-                onFocus={e => (e.target.style.borderColor = `${accent}70`)}
-                onBlur={e => (e.target.style.borderColor = T.border)}
+                value={ex.name}
+                onChange={e => { updateExercise(ex.id, 'name', e.target.value); setShowSuggestions(ex.id); }}
+                onFocus={() => setShowSuggestions(ex.id)}
+                onBlur={() => setTimeout(() => setShowSuggestions(null), 200)}
+                placeholder="Nome esercizio..."
+                className="w-full bg-transparent text-white text-sm font-medium placeholder-zinc-700 outline-none"
               />
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 8 }}>FOCUS / DESCRIZIONE</div>
-              <input
-                value={focus} onChange={e => setFocus(e.target.value)}
-                placeholder="es. Ipertrofia e forza massima"
-                style={{ width: '100%', background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 14, padding: '16px', color: T.text, fontSize: 15, fontWeight: 500, outline: 'none', fontFamily: T.body, boxSizing: 'border-box' }}
-                onFocus={e => (e.target.style.borderColor = `${accent}70`)}
-                onBlur={e => (e.target.style.borderColor = T.border)}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 10 }}>CATEGORIA</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {CATEGORIES.map(cat => (
-                  <button
-                    key={cat.value}
-                    onClick={() => setCategory(cat.value)}
-                    style={{ padding: '14px', borderRadius: 18, border: `1px solid ${category === cat.value ? cat.color : T.border}`, background: category === cat.value ? `${cat.color}10` : T.bg2, cursor: 'pointer', textAlign: 'left', fontFamily: T.body, transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 10 }}
-                  >
-                    <span style={{ fontSize: 22 }}>{cat.emoji}</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: category === cat.value ? cat.color : T.text }}>{cat.label}</div>
-                      {category === cat.value && <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: cat.color, letterSpacing: '0.08em', marginTop: 1 }}>Selezionato</div>}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── STEP 2: EXERCISES ──────────────────────────────────────── */}
-        {step === 'exercises' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 12, color: T.muted, marginBottom: 4 }}>Aggiungi gli esercizi. Massimo 12.</div>
-            {exercises.map((ex, idx) => (
-              <div key={ex.id} style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 20, overflow: 'hidden' }}>
-                {/* Name row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: `1px solid ${T.border}`, position: 'relative' }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 9, background: T.bg3, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ fontFamily: T.mono, fontSize: 10, fontWeight: 600, color: T.muted }}>{String(idx + 1).padStart(2, '0')}</span>
-                  </div>
-                  <div style={{ flex: 1, position: 'relative' }}>
-                    <input
-                      value={ex.name}
-                      onChange={e => { updateEx(ex.id, 'name', e.target.value); setShowSug(ex.id); }}
-                      onFocus={() => setShowSug(ex.id)}
-                      onBlur={() => setTimeout(() => setShowSug(null), 200)}
-                      placeholder="Nome esercizio..."
-                      style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontWeight: 600, fontFamily: T.body }}
-                    />
-                    {showSug === ex.id && ex.name.length > 0 && (
-                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: T.bg3, border: `1px solid ${T.border2}`, borderRadius: 14, zIndex: 20, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
-                        {SUGGESTIONS.filter(s => s.toLowerCase().includes(ex.name.toLowerCase()) && s !== ex.name).slice(0, 5).map(s => (
-                          <button key={s} onMouseDown={() => updateEx(ex.id, 'name', s)} style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: T.muted2, fontSize: 13, cursor: 'pointer', fontFamily: T.body, borderBottom: `1px solid ${T.border}` }}>
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button onClick={() => removeEx(ex.id)} disabled={exercises.length <= 1} style={{ width: 28, height: 28, borderRadius: 9, background: 'rgba(255,93,59,0.08)', border: 'none', cursor: exercises.length <= 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.coral, opacity: exercises.length <= 1 ? 0.3 : 1 }}>
-                    <X size={13} />
-                  </button>
+              {showSuggestions === ex.id && ex.name.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-800 rounded-xl border border-zinc-700 shadow-2xl z-20 max-h-36 overflow-y-auto">
+                  {EXERCISE_SUGGESTIONS
+                    .filter(s => s.toLowerCase().includes(ex.name.toLowerCase()) && s !== ex.name)
+                    .slice(0, 5)
+                    .map(s => (
+                      <button key={s} onMouseDown={() => updateExercise(ex.id, 'name', s)}
+                        className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 transition-colors first:rounded-t-xl last:rounded-b-xl">
+                        {s}
+                      </button>
+                    ))}
                 </div>
-                {/* Sets / Reps / Rest */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                  {[
-                    { label: 'Serie', field: 'sets' as keyof ExEntry },
-                    { label: 'Reps', field: 'reps' as keyof ExEntry },
-                    { label: 'Rec (s)', field: 'rest' as keyof ExEntry },
-                  ].map(({ label, field }, i) => (
-                    <div key={field} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 8px', borderRight: i < 2 ? `1px solid ${T.border}` : 'none' }}>
-                      <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: T.muted, marginBottom: 4 }}>{label}</div>
-                      <input
-                        type="number" value={ex[field]}
-                        onChange={e => updateEx(ex.id, field, e.target.value)}
-                        style={{ background: 'transparent', border: 'none', outline: 'none', fontFamily: T.display, fontSize: 28, color: accent, width: 60, textAlign: 'center' }}
-                        inputMode="numeric"
-                      />
-                    </div>
-                  ))}
+              )}
+            </div>
+            <button onClick={() => removeExercise(ex.id)} disabled={exercises.length <= 1}
+              className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-20 shrink-0">
+              <X size={13} />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-zinc-800/60">
+            {[
+              { label: 'Serie', field: 'sets' as const, suffix: '' },
+              { label: 'Ripetizioni', field: 'reps' as const, suffix: '' },
+              { label: 'Recupero (s)', field: 'rest' as const, suffix: '"' },
+            ].map(({ label, field, suffix }) => (
+              <div key={field} className="flex flex-col items-center py-3 px-2">
+                <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-600 mb-1">{label}</p>
+                <div className="flex items-baseline gap-0.5">
+                  <input
+                    type="number" value={ex[field]}
+                    onChange={e => updateExercise(ex.id, field, e.target.value)}
+                    className="bg-transparent text-white text-lg font-black text-center w-10 outline-none"
+                    inputMode="numeric"
+                  />
+                  {suffix && <span className="text-zinc-600 text-xs">{suffix}</span>}
                 </div>
               </div>
             ))}
-            {exercises.length < 12 && (
-              <button onClick={addEx} style={{ width: '100%', padding: '16px', borderRadius: 18, background: 'none', border: `1.5px dashed ${T.border2}`, color: T.muted, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: T.body, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' }}>
-                <Plus size={16} /> Aggiungi Esercizio
-              </button>
-            )}
           </div>
-        )}
+        </div>
+      ))}
+      {exercises.length < 12 && (
+        <button onClick={addExercise}
+          className="w-full py-4 rounded-2xl border-2 border-dashed border-zinc-800 text-zinc-600 flex items-center justify-center gap-2 hover:border-zinc-600 hover:text-zinc-400 transition-all active:scale-[0.98] font-bold text-sm">
+          <Plus size={16} /> Aggiungi Esercizio
+        </button>
+      )}
+    </div>
+  );
 
-        {/* ── STEP 3: REVIEW ─────────────────────────────────────────── */}
-        {step === 'review' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Hero card */}
-            <div style={{ borderRadius: 24, padding: '20px', overflow: 'hidden', position: 'relative', background: `linear-gradient(135deg, ${selCat.color}12, ${T.bg2})`, border: `1px solid ${selCat.color}25` }}>
-              <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: selCat.color, opacity: 0.05, filter: 'blur(20px)' }} />
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14, position: 'relative' }}>
-                <span style={{ fontSize: 32 }}>{selCat.emoji}</span>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 2 }}>{selCat.label}</div>
-                  <div style={{ fontFamily: T.display, fontSize: 28, color: T.text, lineHeight: 1 }}>{title}</div>
-                  <div style={{ fontSize: 12, color: T.muted, marginTop: 4 }}>{focus || 'Scheda personalizzata'}</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(0,0,0,0.3)', borderRadius: 10, padding: '5px 10px', fontSize: 11, fontWeight: 700, color: selCat.color }}>
-                  <Dumbbell size={12} /> {exercises.filter(e => e.name.trim()).length} Esercizi
-                </div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(0,0,0,0.3)', borderRadius: 10, padding: '5px 10px', fontSize: 11, fontWeight: 700, color: selCat.color }}>
-                  <Zap size={12} /> {exercises.filter(e => e.name.trim()).reduce((a, e) => a + parseInt(e.sets || '0'), 0)} Serie
-                </div>
-              </div>
-            </div>
-
-            {/* Exercise list */}
-            <div style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 22, overflow: 'hidden' }}>
-              {exercises.filter(e => e.name.trim()).map((ex, i, arr) => (
-                <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none' }}>
-                  <span style={{ fontFamily: T.mono, fontSize: 11, color: T.muted, width: 20 }}>{i + 1}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{ex.name}</div>
-                    <div style={{ fontSize: 10, color: T.muted, marginTop: 2, fontFamily: T.mono }}>{ex.sets}×{ex.reps} · Rec {ex.rest}"</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {isEdit && (
-              <div style={{ background: 'rgba(255,179,71,0.08)', border: '1px solid rgba(255,179,71,0.2)', borderRadius: 14, padding: '12px 16px', fontSize: 12, color: T.amber, textAlign: 'center' }}>
-                ✏️ Stai modificando una scheda esistente. Le modifiche verranno salvate subito.
-              </div>
-            )}
+  // ── Step 3: Review ─────────────────────────────────────────────────────────
+  const renderReview = () => (
+    <div className="space-y-4">
+      <div className="rounded-3xl p-5 border border-zinc-800 overflow-hidden relative"
+        style={{ background: `linear-gradient(135deg, ${selectedCat.color}15, #111)` }}>
+        <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full opacity-10" style={{ backgroundColor: selectedCat.color }} />
+        <div className="flex items-start gap-3 relative z-10">
+          <span className="text-3xl">{selectedCat.emoji}</span>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-0.5">{selectedCat.label}</p>
+            <h2 className="text-xl font-black text-white">{title}</h2>
+            <p className="text-zinc-500 text-sm mt-0.5">{focus || 'Scheda personalizzata'}</p>
           </div>
-        )}
+        </div>
+        <div className="flex gap-3 mt-4 relative z-10">
+          <div className="bg-black/30 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
+            <Dumbbell size={12} style={{ color: selectedCat.color }} />
+            <span className="text-xs font-bold text-zinc-300">{exercises.filter(e => e.name.trim()).length} Esercizi</span>
+          </div>
+          <div className="bg-black/30 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
+            <Zap size={12} style={{ color: selectedCat.color }} />
+            <span className="text-xs font-bold text-zinc-300">
+              {exercises.filter(e => e.name.trim()).reduce((acc, e) => acc + parseInt(e.sets || '0'), 0)} Serie Totali
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* BOTTOM ACTION */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px 32px', background: `linear-gradient(to top, ${T.bg} 60%, transparent)`, borderTop: `1px solid ${T.border}` }}>
-        <div style={{ display: 'flex', gap: 10 }}>
+      <div className="bg-zinc-900/80 rounded-2xl border border-zinc-800 overflow-hidden">
+        {exercises.filter(e => e.name.trim()).map((ex, i, arr) => (
+          <div key={ex.id} className={`flex items-center gap-3 px-4 py-3.5 ${i < arr.length - 1 ? 'border-b border-zinc-800/60' : ''}`}>
+            <span className="text-zinc-600 font-bold text-sm w-5">{i + 1}</span>
+            <div className="flex-1">
+              <p className="text-white font-bold text-sm">{ex.name}</p>
+              <p className="text-zinc-600 text-xs mt-0.5 font-mono">{ex.sets}×{ex.reps} · Rec {ex.rest}"</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {isEdit && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+          <p className="text-amber-400 text-xs font-medium text-center">
+            ✏️ Stai modificando una scheda esistente. Le modifiche verranno salvate subito.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#080808] text-white flex flex-col">
+      {/* Header */}
+      <div className="px-5 pt-14 pb-4 flex items-center gap-3 border-b border-zinc-800/60 shrink-0">
+        <button onClick={onBack} className="w-9 h-9 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center active:scale-90 transition-transform">
+          <ChevronLeft size={18} className="text-zinc-400" />
+        </button>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-black">{isEdit ? 'Modifica Scheda' : 'Crea Scheda'}</h1>
+            {isEdit && <Edit3 size={14} className="text-amber-400" />}
+          </div>
+          <p className="text-xs text-zinc-600">
+            {step === 'info' ? 'Dettagli generali' : step === 'exercises' ? `${exercises.filter(e => e.name.trim()).length} esercizi` : 'Anteprima finale'}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-5">
+        <StepIndicator />
+        {errors.length > 0 && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4">
+            {errors.map((e, i) => <p key={i} className="text-red-400 text-xs font-medium">{e}</p>)}
+          </div>
+        )}
+        {step === 'info'      && renderInfo()}
+        {step === 'exercises' && renderExercises()}
+        {step === 'review'    && renderReview()}
+      </div>
+
+      {/* Bottom action */}
+      <div className="px-5 py-5 border-t border-zinc-800/50 shrink-0 bg-[#080808]">
+        <div className="flex gap-3">
           {step !== 'info' && (
-            <button onClick={() => setStep(step === 'exercises' ? 'info' : 'exercises')} style={{ width: 48, height: 48, borderRadius: 16, background: T.bg2, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.text }}>
-              <ChevronLeft size={20} />
+            <button
+              onClick={() => setStep(step === 'exercises' ? 'info' : 'exercises')}
+              className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center active:scale-95 transition-transform">
+              <ChevronLeft size={20} className="text-zinc-400" />
             </button>
           )}
           <button
-            onClick={step === 'review' ? handleSave : handleNext}
+            onClick={step === 'review' ? handleSave : validateAndProceed}
             disabled={saved}
-            style={{ flex: 1, padding: '14px', borderRadius: 16, border: 'none', background: saved ? T.bg3 : accent, color: saved ? T.muted : '#000', fontSize: 14, fontWeight: 800, letterSpacing: '0.08em', cursor: saved ? 'not-allowed' : 'pointer', fontFamily: T.body, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: saved ? 'none' : `0 4px 24px ${accent}25`, transition: 'all 0.2s' }}
-          >
+            className={`flex-1 py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+              saved ? 'bg-zinc-800 text-zinc-600' : `${accentBg} text-black`
+            }`}>
             {saved ? (
-              <><Check size={18} strokeWidth={3} /> {isEdit ? 'Aggiornata!' : 'Salvata!'}</>
+              <><Check size={16} strokeWidth={3} /> {isEdit ? 'Aggiornata!' : 'Salvata!'}</>
             ) : step === 'review' ? (
-              <><Check size={18} strokeWidth={3} /> {isEdit ? 'AGGIORNA SCHEDA' : 'SALVA SCHEDA'}</>
+              <><Check size={16} strokeWidth={3} /> {isEdit ? 'Aggiorna Scheda' : 'Salva Scheda'}</>
             ) : (
-              <>AVANTI <ChevronLeft size={16} style={{ transform: 'rotate(180deg)' }} /></>
+              <>Avanti <ChevronDown size={16} className="-rotate-90" /></>
             )}
           </button>
         </div>
