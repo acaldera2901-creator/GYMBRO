@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Dumbbell, Flame, Activity, Zap, Timer, ChevronLeft, Play, CheckCircle2, Clock, X, Trophy, StopCircle, Camera, ChevronRight, LayoutDashboard, Minus, Pause, Swords, Trash2, Save, SkipForward, FastForward, Calendar, History, Sparkles } from 'lucide-react';
+import { Plus, Dumbbell, Flame, Activity, Zap, Timer, ChevronLeft, Play, CheckCircle2, Clock, X, Trophy, StopCircle, Camera, ChevronRight, LayoutDashboard, Minus, Pause, Swords, Trash2, Save, SkipForward, FastForward, Calendar, History, Sparkles, Edit3, Lock } from 'lucide-react';
 import { CategoryType, WorkoutCard, Post, UserProfile, ScreenName } from '../types';
 import { getWorkoutImage } from '../lib/workoutImages';
 
@@ -14,6 +14,8 @@ interface WorkoutDetailScreenProps {
   userProfile?: UserProfile;
   onShareToCommunity?: (post: Post) => void;
   onCreateWorkout?: () => void;
+  onEditWorkout?: (workout: WorkoutCard) => void;
+  onDeleteCustomWorkout?: (workoutId: string) => void;
 }
 
 // --- FULL LIBRARY (20 Schede) ---
@@ -328,7 +330,8 @@ const CATEGORY_INFO: Record<CategoryType, { color: string, icon: React.ElementTy
 };
 
 const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ 
-    onBack, customWorkouts, onWorkoutComplete, initialWorkoutId, isDarkMode, userProfile, onCreateWorkout, onShareToCommunity
+    onBack, customWorkouts, onWorkoutComplete, initialWorkoutId, isDarkMode, userProfile,
+    onCreateWorkout, onShareToCommunity, onEditWorkout, onDeleteCustomWorkout
 }) => {
   // MERGE: libreria default (20 schede) + schede custom dell'utente (non duplicare)
   const activeDatabase = useMemo(() => {
@@ -701,13 +704,39 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                     </div>
                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                       {customWorkoutsList.slice(0, 5).map((w) => (
-                        <div key={w.id} onClick={() => setActiveWorkout(w)} 
-                          className={`shrink-0 w-44 p-4 rounded-2xl cursor-pointer active:scale-95 transition-transform border ${isDarkMode ? 'bg-purple-500/5 border-purple-500/20' : 'bg-purple-50 border-purple-200'}`}>
-                          <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mb-3">
-                            <Sparkles size={18} className="text-purple-400" />
+                        <div key={w.id} className={`shrink-0 w-44 rounded-2xl border overflow-hidden ${isDarkMode ? 'bg-purple-500/5 border-purple-500/20' : 'bg-purple-50 border-purple-200'}`}>
+                          {/* Card body — apre la scheda */}
+                          <div onClick={() => setActiveWorkout(w)} className="p-4 cursor-pointer active:scale-95 transition-transform">
+                            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mb-3">
+                              <Sparkles size={18} className="text-purple-400" />
+                            </div>
+                            <h4 className={`font-bold text-sm ${theme.text} truncate`}>{w.title}</h4>
+                            <p className={`text-[10px] ${theme.textSub} mt-1`}>{w.exercises.length} Esercizi</p>
                           </div>
-                          <h4 className={`font-bold text-sm ${theme.text} truncate`}>{w.title}</h4>
-                          <p className={`text-[10px] ${theme.textSub} mt-1`}>{w.exercises.length} Esercizi</p>
+                          {/* Azioni edit/delete */}
+                          {(onEditWorkout || onDeleteCustomWorkout) && (
+                            <div className={`flex border-t ${isDarkMode ? 'border-purple-500/20' : 'border-purple-200'}`}>
+                              {onEditWorkout && (
+                                <button
+                                  onClick={e => { e.stopPropagation(); onEditWorkout(w); }}
+                                  className={`flex-1 py-2 flex items-center justify-center gap-1 text-[10px] font-bold text-purple-400 hover:bg-purple-500/10 transition-colors`}
+                                >
+                                  <Edit3 size={11} /> Modifica
+                                </button>
+                              )}
+                              {onEditWorkout && onDeleteCustomWorkout && (
+                                <div className={`w-px ${isDarkMode ? 'bg-purple-500/20' : 'bg-purple-200'}`} />
+                              )}
+                              {onDeleteCustomWorkout && (
+                                <button
+                                  onClick={e => { e.stopPropagation(); onDeleteCustomWorkout(w.id); }}
+                                  className="flex-1 py-2 flex items-center justify-center gap-1 text-[10px] font-bold text-red-400 hover:bg-red-500/10 transition-colors"
+                                >
+                                  <Trash2 size={11} /> Elimina
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                       {onCreateWorkout && (
@@ -784,7 +813,37 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                   <h1 className="text-4xl font-extrabold text-white mb-2 leading-none">{activeWorkout.title}</h1>
                   <p className="text-zinc-300 font-medium text-lg">{activeWorkout.focus}</p>
                   <div className="flex gap-4 mt-4">
-                      <button onClick={() => setIsSessionActive(true)} className="flex-1 bg-emerald-500 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-105 transition-transform"><Play fill="currentColor" size={20}/> INIZIA</button>
+                    {activeWorkout.isCompleted ? (
+                      // SESSIONE COMPLETATA — bloccata, non riavviabile
+                      <div className="flex-1 bg-zinc-800/80 border border-zinc-700 rounded-2xl py-4 flex flex-col items-center justify-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 size={18} className="text-emerald-400" />
+                          <span className="text-emerald-400 font-bold text-sm">Sessione Completata</span>
+                        </div>
+                        {activeWorkout.completedDuration && (
+                          <span className="text-zinc-500 text-xs font-mono">
+                            {Math.floor(activeWorkout.completedDuration / 60)} min • {new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}
+                          </span>
+                        )}
+                        <span className="text-zinc-600 text-[10px] mt-0.5 flex items-center gap-1">
+                          <Lock size={9} /> Non modificabile dopo il completamento
+                        </span>
+                      </div>
+                    ) : (
+                      // SESSIONE NON ANCORA FATTA — avviabile normalmente
+                      <button onClick={() => setIsSessionActive(true)} className="flex-1 bg-emerald-500 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-105 transition-transform">
+                        <Play fill="currentColor" size={20}/> INIZIA
+                      </button>
+                    )}
+                    {/* Pulsante modifica — solo per schede custom non completate */}
+                    {activeWorkout.isCustom && !activeWorkout.isCompleted && onEditWorkout && (
+                      <button
+                        onClick={() => onEditWorkout(activeWorkout)}
+                        className="w-14 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-2xl flex items-center justify-center hover:bg-zinc-700 transition-colors active:scale-95"
+                      >
+                        <Edit3 size={18} />
+                      </button>
+                    )}
                   </div>
               </div>
           </div>
