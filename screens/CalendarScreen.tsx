@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Dumbbell, Trash2, X, CheckCircle2, Camera, Clock, Zap, Play, Trophy, Flame } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Dumbbell, CheckCircle2, Play, Trash2, Camera } from 'lucide-react';
 import { WorkoutCard, CategoryType } from '../types';
 
 interface CalendarScreenProps {
@@ -14,279 +13,261 @@ interface CalendarScreenProps {
   themeColor?: string;
 }
 
-const MONTHS = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
-const DAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+const T = {
+  bg: '#07070A', bg2: '#0F0F14', bg3: '#16161D', bg4: '#1E1E27',
+  border: 'rgba(255,255,255,0.07)', border2: 'rgba(255,255,255,0.12)',
+  lime: '#C8FF00', coral: '#FF5D3B', amber: '#FFB347', sky: '#38BDF8', violet: '#A78BFA',
+  muted: '#6B6B80', muted2: '#8E8EA0', text: '#F0F0F5',
+  display: "'Bebas Neue', sans-serif", body: "'DM Sans', sans-serif",
+};
 
-const CalendarScreen: React.FC<CalendarScreenProps> = ({ 
-  schedule, 
-  availableWorkouts, 
-  onScheduleWorkout, 
-  onRemoveWorkout,
-  onStartWorkout,
-  onNavigateHome,
-  isDarkMode,
-  themeColor = 'emerald'
+const MONTHS = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const DAYS_SHORT = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+
+const CalendarScreen: React.FC<CalendarScreenProps> = ({
+  schedule, availableWorkouts, onScheduleWorkout, onRemoveWorkout,
+  onStartWorkout, onNavigateHome, isDarkMode, themeColor = 'emerald',
 }) => {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(new Date());
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<CategoryType | 'All'>('All');
+  const accent = themeColor === 'rose' ? T.coral : T.lime;
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentWeekStart, setCurrentWeekStart] = useState(new Date());
+  const [isAddModal, setIsAddModal] = useState(false);
+  const [catFilter, setCatFilter] = useState<CategoryType | 'All'>('All');
 
   useEffect(() => {
-      const d = new Date();
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
-      setCurrentWeekStart(monday);
-      setSelectedDate(new Date()); 
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    setCurrentWeekStart(new Date(new Date().setDate(diff)));
   }, []);
 
-  const theme = {
-      bg: isDarkMode ? 'bg-black' : 'bg-[#f2f2f7]',
-      text: isDarkMode ? 'text-white' : 'text-slate-900',
-      textSub: isDarkMode ? 'text-zinc-400' : 'text-slate-500',
-      card: isDarkMode ? 'bg-[#1c1c1e] border-white/5' : 'bg-white border-slate-200 shadow-sm',
-      accent: `text-${themeColor}-500`,
-      accentBg: `bg-${themeColor}-500`,
-      accentBorder: `border-${themeColor}-500`,
-  };
-
-  const getDateKey = (date: Date) => date.toISOString().split('T')[0];
-
-  const handlePrevWeek = () => {
-      const newStart = new Date(currentWeekStart);
-      newStart.setDate(currentWeekStart.getDate() - 7);
-      setCurrentWeekStart(newStart);
-  };
-
-  const handleNextWeek = () => {
-      const newStart = new Date(currentWeekStart);
-      newStart.setDate(currentWeekStart.getDate() + 7);
-      setCurrentWeekStart(newStart);
-  };
-
-  const handleDayClick = (date: Date) => {
-      setSelectedDate(date);
-  };
-
-  const handleAddWorkout = (workout: WorkoutCard) => {
-      onScheduleWorkout(getDateKey(selectedDate), workout);
-      setIsAddModalOpen(false);
-  };
-
-  const selectedKey = getDateKey(selectedDate);
-  const scheduledForSelectedDate = schedule[selectedKey] || [];
-  const isToday = selectedKey === getDateKey(new Date());
+  const getKey = (d: Date) => d.toISOString().split('T')[0];
 
   const weekDays = useMemo(() => {
-      const days = [];
-      for (let i = 0; i < 7; i++) {
-          const d = new Date(currentWeekStart);
-          d.setDate(currentWeekStart.getDate() + i);
-          days.push(d);
-      }
-      return days;
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(currentWeekStart);
+      d.setDate(currentWeekStart.getDate() + i);
+      return d;
+    });
   }, [currentWeekStart]);
 
-  const dailySummary = useMemo(() => {
-      const completed = scheduledForSelectedDate.filter(w => w.isCompleted || w.completedImage || w.id.startsWith('done_'));
-      const totalMins = completed.reduce((acc, w) => acc + Math.floor((w.completedDuration || 0) / 60), 0);
-      return { count: completed.length, mins: totalMins };
-  }, [scheduledForSelectedDate]);
+  const selectedKey = getKey(selectedDate);
+  const todayKey = getKey(new Date());
+  const scheduledForDay = schedule[selectedKey] || [];
+  const isToday = selectedKey === todayKey;
 
-  const filteredAvailableWorkouts = selectedCategoryFilter === 'All' 
-    ? availableWorkouts 
-    : availableWorkouts.filter(w => w.category === selectedCategoryFilter);
+  const completedCount = scheduledForDay.filter(w => w.isCompleted || w.id.startsWith('done_')).length;
+  const totalMins = scheduledForDay.filter(w => w.isCompleted).reduce((a, w) => a + Math.floor((w.completedDuration || 0) / 60), 0);
+
+  const prevWeek = () => { const d = new Date(currentWeekStart); d.setDate(d.getDate() - 7); setCurrentWeekStart(d); };
+  const nextWeek = () => { const d = new Date(currentWeekStart); d.setDate(d.getDate() + 7); setCurrentWeekStart(d); };
+
+  const filtered = catFilter === 'All' ? availableWorkouts : availableWorkouts.filter(w => w.category === catFilter);
+
+  const card: React.CSSProperties = { background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 22 };
 
   return (
-    <div className={`min-h-screen ${theme.bg} ${theme.text} flex flex-col pb-24 transition-colors duration-300 relative`}>
-      
-      {/* Header Month/Year */}
-      <div className="pt-safe px-6 pb-2 flex items-center justify-between sticky top-0 z-20 bg-opacity-90 backdrop-blur-md transition-colors" style={{backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(242,242,247,0.8)'}}>
-         <div>
-            <h1 className="text-2xl font-black capitalize">{MONTHS[currentWeekStart.getMonth()]} <span className="text-lg font-medium opacity-50">{currentWeekStart.getFullYear()}</span></h1>
-         </div>
-         <div className="flex gap-2">
-            <button onClick={handlePrevWeek} className={`w-8 h-8 rounded-full flex items-center justify-center border ${isDarkMode ? 'border-white/10 hover:bg-white/10' : 'border-slate-200 hover:bg-slate-200'}`}><ChevronLeft size={18}/></button>
-            <button onClick={handleNextWeek} className={`w-8 h-8 rounded-full flex items-center justify-center border ${isDarkMode ? 'border-white/10 hover:bg-white/10' : 'border-slate-200 hover:bg-slate-200'}`}><ChevronRight size={18}/></button>
-         </div>
+    <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.body, paddingBottom: 112 }}>
+
+      {/* ── STICKY HEADER ─────────────────────────────────────────────── */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 20, background: 'rgba(7,7,10,0.92)', backdropFilter: 'blur(20px)', borderBottom: `1px solid ${T.border}`, padding: '52px 20px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontFamily: T.display, fontSize: 36, color: T.text, lineHeight: 1 }}>
+              {MONTHS[currentWeekStart.getMonth()]}
+              <span style={{ fontSize: 18, color: T.muted, marginLeft: 8 }}>{currentWeekStart.getFullYear()}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={prevWeek} style={{ width: 36, height: 36, borderRadius: 12, background: T.bg2, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.text }}>
+              <ChevronLeft size={16} />
+            </button>
+            <button onClick={nextWeek} style={{ width: 36, height: 36, borderRadius: 12, background: T.bg2, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.text }}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Week strip */}
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          {weekDays.map((date, idx) => {
+            const dKey = getKey(date);
+            const isSelected = dKey === selectedKey;
+            const isCurr = dKey === todayKey;
+            const dayWorkouts = schedule[dKey] || [];
+            const hasDone = dayWorkouts.some(w => w.isCompleted || w.id.startsWith('done_'));
+            const hasSched = dayWorkouts.length > 0;
+            return (
+              <button
+                key={idx}
+                onClick={() => setSelectedDate(new Date(date))}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  width: '13%', aspectRatio: '4/6', borderRadius: 18, cursor: 'pointer', border: 'none',
+                  background: isSelected ? accent : isCurr ? T.bg3 : 'transparent',
+                  transition: 'all 0.2s',
+                  boxShadow: isSelected ? `0 0 20px ${accent}35` : 'none',
+                  transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                }}
+              >
+                <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isSelected ? '#000' : T.muted, marginBottom: 2 }}>{DAYS_SHORT[idx]}</span>
+                <span style={{ fontFamily: T.display, fontSize: 20, color: isSelected ? '#000' : T.text, lineHeight: 1 }}>{date.getDate()}</span>
+                <div style={{ marginTop: 4, height: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {hasDone
+                    ? <div style={{ width: 5, height: 5, borderRadius: '50%', background: isSelected ? '#000' : accent }} />
+                    : hasSched
+                    ? <div style={{ width: 5, height: 5, borderRadius: '50%', border: `1.5px solid ${isSelected ? '#000' : T.muted}` }} />
+                    : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* WEEK STRIP */}
-      <div className="px-4 py-4 mb-2">
-          <div className="flex justify-between items-center bg-transparent">
-              {weekDays.map((date, idx) => {
-                  const dKey = getDateKey(date);
-                  const isSelected = dKey === selectedKey;
-                  const isCurrentDay = dKey === getDateKey(new Date());
-                  
-                  const dayWorkouts = schedule[dKey] || [];
-                  const hasCompleted = dayWorkouts.some(w => w.isCompleted || w.completedImage || w.id.startsWith('done_'));
-                  const hasScheduled = dayWorkouts.length > 0;
+      {/* ── CONTENT ───────────────────────────────────────────────────── */}
+      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-                  return (
-                      <button 
-                        key={idx} 
-                        onClick={() => handleDayClick(date)}
-                        className={`relative flex flex-col items-center justify-center w-[13%] aspect-[4/6] rounded-2xl transition-all duration-300 ${
-                            isSelected 
-                            ? `${theme.accentBg} text-slate-950 shadow-lg shadow-${themeColor}-500/25 scale-105 z-10` 
-                            : (isCurrentDay ? (isDarkMode ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-slate-200') : 'bg-transparent')
-                        }`}
-                      >
-                          <span className={`text-[10px] font-bold uppercase mb-1 ${isSelected ? 'text-slate-900/60' : theme.textSub}`}>{DAYS_SHORT[idx]}</span>
-                          <span className={`text-lg font-black ${isSelected ? 'text-slate-950' : theme.text}`}>{date.getDate()}</span>
-                          
-                          <div className="mt-2 h-2 flex items-center justify-center">
-                              {hasCompleted ? (
-                                  <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-slate-950' : theme.accentBg}`}></div>
-                              ) : hasScheduled ? (
-                                  <div className={`w-1.5 h-1.5 rounded-full border ${isSelected ? 'border-slate-950' : 'border-zinc-500'}`}></div>
-                              ) : null}
+        {/* Day summary */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontFamily: T.display, fontSize: 28, color: T.text, lineHeight: 1 }}>
+              {isToday ? 'OGGI' : `${selectedDate.getDate()} ${MONTHS[selectedDate.getMonth()].toUpperCase()}`}
+            </div>
+            {completedCount > 0 && <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>{completedCount} completato/i · {totalMins} min</div>}
+          </div>
+          <button
+            onClick={() => setIsAddModal(true)}
+            style={{ width: 40, height: 40, borderRadius: 14, background: accent, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: `0 4px 16px ${accent}35` }}
+          >
+            <Plus size={20} style={{ color: '#000' }} strokeWidth={3} />
+          </button>
+        </div>
+
+        {/* Workout list */}
+        {scheduledForDay.length === 0 ? (
+          <div style={{ ...card, padding: '40px 20px', textAlign: 'center', border: `1px dashed ${T.border2}` }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>📅</div>
+            <div style={{ fontSize: 14, color: T.muted, marginBottom: 12 }}>Nessun allenamento programmato.</div>
+            <button onClick={() => setIsAddModal(true)} style={{ background: `${accent}15`, border: `1px solid ${accent}30`, color: accent, borderRadius: 12, padding: '8px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: T.body }}>
+              + Aggiungi Workout
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {scheduledForDay.map((workout, idx) => {
+              const isCompleted = workout.isCompleted || !!workout.completedImage || workout.id.startsWith('done_');
+              return (
+                <div key={`${workout.id}-${idx}`} style={{ ...card, overflow: 'hidden', border: `1px solid ${isCompleted ? `${accent}30` : T.border}` }}>
+                  {workout.completedImage ? (
+                    <div style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden' }}>
+                      <img src={workout.completedImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(7,7,10,0.9) 0%, transparent 50%)' }} />
+                      <div style={{ position: 'absolute', bottom: 12, left: 14, right: 14, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: accent, borderRadius: 6, padding: '2px 8px', fontSize: 9, fontWeight: 800, color: '#000', marginBottom: 4 }}>
+                            <Camera size={9} /> Memory
                           </div>
-                      </button>
-                  )
-              })}
-          </div>
-      </div>
-
-      {/* Content Area */}
-      <div className="flex-1 px-5 animate-in slide-in-from-bottom-4 fade-in duration-500">
-          
-          <div className="flex items-center justify-between mb-4">
-              <h2 className={`font-bold text-lg ${theme.text}`}>{isToday ? 'Oggi' : `${selectedDate.getDate()} ${MONTHS[selectedDate.getMonth()]}`}</h2>
-              <button onClick={() => setIsAddModalOpen(true)} className={`w-8 h-8 rounded-full ${theme.accentBg} text-slate-950 flex items-center justify-center active:scale-95 transition-transform shadow-lg shadow-${themeColor}-500/20`}><Plus size={18} strokeWidth={3} /></button>
-          </div>
-
-          {/* SMART SUMMARY TILE */}
-          <div className={`mb-6 p-5 rounded-3xl relative overflow-hidden flex items-center justify-between border ${theme.accentBorder} bg-${themeColor}-500/10 transition-all duration-500 animate-in zoom-in-95`}>
-              <div className="relative z-10">
-                  <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.accent} mb-1`}>Riepilogo Giorno</p>
-                  <div className="flex items-baseline gap-1">
-                     <span className={`text-4xl font-black ${theme.text}`}>{dailySummary.count}</span>
-                     <span className="text-xs font-bold text-zinc-500">Allenamenti</span>
-                  </div>
-                  <p className={`text-xs ${theme.textSub} mt-1`}>{dailySummary.mins} Minuti Totali</p>
-              </div>
-              <div className={`w-12 h-12 rounded-full ${theme.accentBg} flex items-center justify-center text-slate-950 shadow-lg shadow-${themeColor}-500/20 relative z-10`}>
-                  <CheckCircle2 size={24} />
-              </div>
-              <div className={`absolute -right-4 -bottom-4 w-24 h-24 ${theme.accentBg} opacity-20 blur-2xl rounded-full pointer-events-none`}></div>
-          </div>
-
-          {/* Workout List */}
-          <div className="space-y-3">
-              {scheduledForSelectedDate.length === 0 ? (
-                  <div className={`py-12 flex flex-col items-center justify-center text-center opacity-40 border-2 border-dashed rounded-3xl ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
-                      <CalendarIcon size={32} className="mb-2" />
-                      <p className="text-sm font-medium">Nessun programma.</p>
-                      <button onClick={() => setIsAddModalOpen(true)} className={`mt-2 text-xs font-bold ${theme.accent}`}>+ Aggiungi</button>
-                  </div>
-              ) : (
-                  scheduledForSelectedDate.map((workout, idx) => {
-                      const isCompleted = workout.isCompleted || !!workout.completedImage || workout.id.startsWith('done_');
-                      const hasImage = !!workout.completedImage;
-
-                      return (
-                          <div key={`${workout.id}-${idx}`} className="group relative transition-transform active:scale-[0.99]">
-                               {hasImage ? (
-                                  <div className={`aspect-video w-full rounded-2xl overflow-hidden relative shadow-lg border ${isDarkMode ? 'border-white/10' : 'border-slate-100'}`}>
-                                      <img src={workout.completedImage!} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-                                      <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
-                                          <div>
-                                              <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${theme.accentBg} text-slate-950 mb-1`}>
-                                                  <Camera size={10} /> Memory
-                                              </div>
-                                              <p className="text-white font-bold text-sm leading-tight">{workout.title}</p>
-                                          </div>
-                                          <button 
-                                            onClick={(e) => { e.stopPropagation(); onRemoveWorkout(selectedKey, workout.id); }} 
-                                            className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white/70 hover:text-red-400 hover:bg-black/60 transition-colors"
-                                          >
-                                              <Trash2 size={16} />
-                                          </button>
-                                      </div>
-                                  </div>
-                               ) : (
-                                  <div className={`${theme.card} p-4 rounded-2xl border flex items-center gap-4 relative overflow-hidden`}>
-                                       {isCompleted && <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.accentBg}`}></div>}
-                                       
-                                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border ${isCompleted ? `${theme.accentBg} border-transparent text-slate-950` : (isDarkMode ? 'bg-zinc-800 border-zinc-700 text-zinc-500' : 'bg-slate-50 border-slate-200 text-slate-400')}`}>
-                                           {isCompleted ? <CheckCircle2 size={20} /> : <Dumbbell size={20} />}
-                                       </div>
-                                       
-                                       <div className="flex-1 min-w-0">
-                                           <h3 className={`font-bold text-sm truncate ${isCompleted ? (isDarkMode ? 'text-zinc-400 line-through' : 'text-slate-400 line-through') : theme.text}`}>{workout.title}</h3>
-                                           <p className="text-xs text-zinc-500 flex items-center gap-2 mt-0.5">
-                                               <span>{workout.category}</span>
-                                           </p>
-                                       </div>
-
-                                       <div className="flex items-center gap-2">
-                                          {!isCompleted && (
-                                              <button onClick={() => onStartWorkout(workout.id)} className={`w-8 h-8 rounded-full ${theme.accentBg} text-slate-950 flex items-center justify-center shadow-lg shadow-${themeColor}-500/20`}><Play size={14} fill="currentColor" /></button>
-                                          )}
-                                          <button 
-                                            onClick={(e) => { e.stopPropagation(); onRemoveWorkout(selectedKey, workout.id); }} 
-                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-zinc-500 hover:text-red-500 hover:bg-red-500/10 transition-colors border border-transparent hover:border-red-500/20`}
-                                          >
-                                              <Trash2 size={16} />
-                                          </button>
-                                      </div>
-                                  </div>
-                               )}
-                          </div>
-                      )
-                  })
-              )}
-          </div>
-      </div>
-
-      {/* Add Modal */}
-      {isAddModalOpen && (
-          <div className="fixed inset-0 z-[60] flex items-end justify-center">
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => setIsAddModalOpen(false)}></div>
-              <div className={`relative w-full max-w-md h-[70vh] rounded-t-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300 ${isDarkMode ? 'bg-[#1c1c1e]' : 'bg-white'}`}>
-                  <div className="w-full flex justify-center pt-3 pb-1"><div className="w-12 h-1.5 rounded-full bg-zinc-500/20"></div></div>
-                  <div className="px-6 pb-4 pt-2 flex justify-between items-center border-b border-white/5">
-                      <div>
-                          <h3 className={`font-bold text-lg ${theme.text}`}>Aggiungi Workout</h3>
-                          <p className={`text-xs ${theme.textSub}`}>{selectedDate.getDate()} {MONTHS[selectedDate.getMonth()]}</p>
+                          <div style={{ fontFamily: T.display, fontSize: 20, color: T.text }}>{workout.title}</div>
+                        </div>
+                        <button onClick={() => onRemoveWorkout(selectedKey, workout.id)} style={{ padding: 8, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: 10, cursor: 'pointer', color: T.muted }}>
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                      <button onClick={() => setIsAddModalOpen(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-400"><X size={18}/></button>
-                  </div>
-                  
-                  <div className="px-6 py-3 flex gap-2 overflow-x-auto scrollbar-hide">
-                      {(['All', 'Massa', 'Definizione', 'Perdita Peso', 'Resistenza', 'Custom'] as const).map(cat => (
-                          <button key={cat} onClick={() => setSelectedCategoryFilter(cat)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors whitespace-nowrap ${selectedCategoryFilter === cat ? `${theme.accentBg} text-slate-950 border-transparent` : (isDarkMode ? 'border-zinc-700 text-zinc-400' : 'border-slate-200 text-slate-500')}`}>
-                              {cat === 'All' ? 'Tutti' : cat === 'Custom' ? 'Le Mie' : cat}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
+                      {isCompleted && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent, borderRadius: '22px 0 0 22px' }} />}
+                      <div style={{ width: 48, height: 48, borderRadius: 16, background: isCompleted ? `${accent}18` : T.bg3, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {isCompleted
+                          ? <CheckCircle2 size={22} style={{ color: accent }} />
+                          : <Dumbbell size={22} style={{ color: T.muted }} />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: isCompleted ? T.muted : T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: isCompleted ? 'line-through' : 'none' }}>
+                          {workout.title}
+                        </div>
+                        <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{workout.category}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {!isCompleted && (
+                          <button onClick={() => onStartWorkout(workout.id)} style={{ width: 34, height: 34, borderRadius: 11, background: accent, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 4px 12px ${accent}35` }}>
+                            <Play size={14} fill="#000" style={{ color: '#000', marginLeft: 2 }} />
                           </button>
-                      ))}
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                      {filteredAvailableWorkouts.map(workout => (
-                          <button key={workout.id} onClick={() => handleAddWorkout(workout)} className={`w-full text-left p-4 rounded-2xl border flex items-center justify-between group transition-colors ${isDarkMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
-                              <div className="flex items-center gap-3">
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${isDarkMode ? 'bg-zinc-800 text-zinc-400' : 'bg-white text-slate-400'} group-hover:${theme.accent} group-hover:bg-${themeColor}-500/10`}>
-                                      {workout.title.charAt(0)}
-                                  </div>
-                                  <div>
-                                      <p className={`font-bold text-sm ${theme.text}`}>{workout.title}</p>
-                                      <p className={`text-xs ${theme.textSub}`}>{workout.category} • {workout.exercises.length} Es.</p>
-                                  </div>
-                              </div>
-                              <div className={`w-6 h-6 rounded-full border flex items-center justify-center ${isDarkMode ? 'border-zinc-700' : 'border-slate-300'} group-hover:border-${themeColor}-500`}>
-                                  <div className={`w-2.5 h-2.5 rounded-full ${theme.accentBg} opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-                              </div>
-                          </button>
-                      ))}
-                  </div>
-              </div>
+                        )}
+                        <button onClick={() => onRemoveWorkout(selectedKey, workout.id)} style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,93,59,0.08)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Trash2 size={14} style={{ color: T.coral }} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-      )}
+        )}
+      </div>
 
+      {/* ── ADD MODAL ─────────────────────────────────────────────────── */}
+      {isAddModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={() => setIsAddModal(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 430, height: '72vh', background: T.bg2, borderRadius: '28px 28px 0 0', border: `1px solid ${T.border2}`, display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s cubic-bezier(0.34,1.2,0.64,1)' }}>
+            <style>{`@keyframes slideUp { from{transform:translateY(100%)} to{transform:none} }`}</style>
+
+            {/* Handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
+              <div style={{ width: 40, height: 4, borderRadius: 100, background: T.border2 }} />
+            </div>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 14px', borderBottom: `1px solid ${T.border}` }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>Aggiungi Workout</div>
+                <div style={{ fontSize: 11, color: T.muted }}>{selectedDate.getDate()} {MONTHS[selectedDate.getMonth()]}</div>
+              </div>
+              <button onClick={() => setIsAddModal(false)} style={{ width: 32, height: 32, borderRadius: 10, background: T.bg3, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.muted }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Category filter */}
+            <div style={{ display: 'flex', gap: 8, padding: '12px 20px', overflowX: 'auto' }}>
+              {(['All', 'Massa', 'Definizione', 'Perdita Peso', 'Resistenza', 'Custom'] as const).map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setCatFilter(cat as any)}
+                  style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 100, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: T.body, border: `1px solid ${catFilter === cat ? accent : T.border}`, background: catFilter === cat ? `${accent}15` : T.bg3, color: catFilter === cat ? accent : T.muted, transition: 'all 0.2s' }}
+                >
+                  {cat === 'All' ? 'Tutti' : cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Workout list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {filtered.map(workout => (
+                <button
+                  key={workout.id}
+                  onClick={() => { onScheduleWorkout(selectedKey, workout); setIsAddModal(false); }}
+                  style={{ width: '100%', textAlign: 'left', padding: '14px 16px', borderRadius: 18, border: `1px solid ${T.border}`, background: T.bg3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontFamily: T.body, transition: 'border-color 0.2s' }}
+                >
+                  <div style={{ width: 42, height: 42, borderRadius: 13, background: T.bg4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontFamily: T.display, fontSize: 18, color: accent }}>{workout.title.charAt(0)}</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{workout.title}</div>
+                    <div style={{ fontSize: 11, color: T.muted, marginTop: 1 }}>{workout.category} · {workout.exercises.length} esercizi</div>
+                  </div>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: accent, opacity: 0 }} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

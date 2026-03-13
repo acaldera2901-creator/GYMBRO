@@ -1,240 +1,268 @@
-import React, { useState } from 'react';
-import { ChevronLeft, Flame, Droplets, Beef, Wheat, Apple, Info, TrendingUp, Zap, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { UserProfile, UserStats } from '../types';
 
 interface NutrizioneScreenProps {
   userProfile: UserProfile;
-  userStats: UserStats;
-  isDarkMode: boolean;
-  themeColor: string;
+  userStats:   UserStats;
+  isDarkMode:  boolean;
+  themeColor:  string;
   onBack: () => void;
 }
+
+const T = {
+  bg: '#07070A', bg2: '#0F0F14', bg3: '#16161D',
+  border: 'rgba(255,255,255,0.07)',
+  lime: '#C8FF00', coral: '#FF5D3B', amber: '#FFB347', sky: '#38BDF8', violet: '#A78BFA',
+  muted: '#6B6B80', muted2: '#8E8EA0', text: '#F0F0F5',
+  display: "'Bebas Neue', sans-serif", body: "'DM Sans', sans-serif",
+};
 
 const MEAL_PLANS: Record<string, { name: string; meals: { time: string; title: string; desc: string; kcal: number }[] }> = {
   muscle: {
     name: 'Ipertrofia',
     meals: [
       { time: '07:30', title: 'Colazione',        desc: 'Avena 80g + 4 albumi + 1 uovo intero + frutta', kcal: 480 },
-      { time: '10:30', title: 'Spuntino Pre',      desc: 'Riso soffiato 40g + burro di arachidi 20g',       kcal: 250 },
-      { time: '13:00', title: 'Pranzo',            desc: 'Petto di pollo 200g + riso 100g + verdure',        kcal: 620 },
-      { time: '16:00', title: 'Pre-Workout',       desc: 'Banana + whey protein 30g',                       kcal: 280 },
-      { time: '19:30', title: 'Post-Workout Cena', desc: 'Salmone 180g + patate dolci 150g + insalata',      kcal: 580 },
-      { time: '22:00', title: 'Spuntino Notte',    desc: 'Ricotta 150g + mandorle 15g',                     kcal: 240 },
-    ]
+      { time: '10:30', title: 'Spuntino Pre',      desc: 'Riso soffiato 40g + burro di arachidi 20g',      kcal: 250 },
+      { time: '13:00', title: 'Pranzo',            desc: 'Pollo 200g + riso 100g + verdure',               kcal: 620 },
+      { time: '16:00', title: 'Pre-Workout',       desc: 'Banana + whey protein 30g',                      kcal: 280 },
+      { time: '19:30', title: 'Post-Workout Cena', desc: 'Salmone 180g + patate dolci 150g + insalata',    kcal: 580 },
+      { time: '22:00', title: 'Spuntino Notte',    desc: 'Ricotta 150g + mandorle 15g',                    kcal: 240 },
+    ],
   },
   definition: {
     name: 'Definizione',
     meals: [
-      { time: '07:30', title: 'Colazione',    desc: 'Uova strapazzate 3 + spinaci + pane integrale 1 fetta', kcal: 380 },
-      { time: '10:30', title: 'Spuntino',     desc: 'Yogurt greco 0% + frutti rossi',                       kcal: 180 },
-      { time: '13:00', title: 'Pranzo',       desc: 'Tonno 150g + quinoa 80g + insalatone miste',            kcal: 480 },
-      { time: '16:00', title: 'Pre-Workout',  desc: 'Mela + 1 cucchiaio burro di arachidi',                 kcal: 200 },
-      { time: '19:30', title: 'Cena',         desc: 'Petto di tacchino 180g + verdure grigliate + EVOO',     kcal: 420 },
-    ]
+      { time: '07:30', title: 'Colazione',   desc: 'Uova strapazzate 3 + spinaci + pane integrale', kcal: 380 },
+      { time: '10:30', title: 'Spuntino',    desc: 'Yogurt greco 0% + frutti rossi',                kcal: 180 },
+      { time: '13:00', title: 'Pranzo',      desc: 'Tonno 150g + quinoa 80g + insalatone',          kcal: 480 },
+      { time: '16:00', title: 'Pre-Workout', desc: 'Mela + 1 cucchiaio burro di arachidi',          kcal: 200 },
+      { time: '19:30', title: 'Cena',        desc: 'Tacchino 180g + verdure grigliate',             kcal: 420 },
+    ],
   },
   weight_loss: {
     name: 'Perdita Peso',
     meals: [
-      { time: '08:00', title: 'Colazione',   desc: '2 uova + 2 albumi + verdure saltate',                   kcal: 280 },
-      { time: '11:00', title: 'Spuntino',    desc: 'Sedano + hummus 60g',                                   kcal: 120 },
-      { time: '13:00', title: 'Pranzo',      desc: 'Insalata di pollo 150g + ceci 80g + olive',             kcal: 420 },
-      { time: '16:00', title: 'Spuntino',    desc: 'Proteina in polvere + acqua + frutta secca 10g',        kcal: 180 },
-      { time: '19:00', title: 'Cena',        desc: 'Merluzzo 200g + verdure al vapore + 1 cucchiaio EVOO',  kcal: 320 },
-    ]
+      { time: '08:00', title: 'Colazione', desc: '2 uova + 2 albumi + verdure saltate',               kcal: 280 },
+      { time: '11:00', title: 'Spuntino',  desc: 'Sedano + hummus 60g',                              kcal: 120 },
+      { time: '13:00', title: 'Pranzo',    desc: 'Pollo 150g + ceci 80g + olive',                    kcal: 420 },
+      { time: '16:00', title: 'Spuntino',  desc: 'Proteina in polvere + acqua + frutta secca 10g',   kcal: 180 },
+      { time: '19:00', title: 'Cena',      desc: 'Merluzzo 200g + verdure al vapore',                kcal: 320 },
+    ],
   },
   endurance: {
     name: 'Resistenza',
     meals: [
-      { time: '07:00', title: 'Colazione',       desc: 'Porridge d\'avena 100g + banana + miele',           kcal: 520 },
-      { time: '10:00', title: 'Spuntino',        desc: 'Crackers integrali + yogurt greco',                  kcal: 260 },
-      { time: '13:00', title: 'Pranzo',          desc: 'Pasta integrale 120g + legumi + verdure',            kcal: 680 },
-      { time: '16:30', title: 'Pre-Allenamento', desc: 'Banana + gel energetico o datteri',                  kcal: 200 },
-      { time: '19:30', title: 'Post & Cena',     desc: 'Riso 100g + uova 3 + verdure + frutta',              kcal: 560 },
-    ]
+      { time: '07:00', title: 'Colazione',       desc: "Porridge d'avena 100g + banana + miele",   kcal: 520 },
+      { time: '10:00', title: 'Spuntino',        desc: 'Crackers integrali + yogurt greco',         kcal: 260 },
+      { time: '13:00', title: 'Pranzo',          desc: 'Pasta integrale 120g + legumi + verdure',   kcal: 680 },
+      { time: '16:30', title: 'Pre-Allenamento', desc: 'Banana + datteri',                          kcal: 200 },
+      { time: '19:30', title: 'Post & Cena',     desc: 'Riso 100g + uova 3 + verdure + frutta',     kcal: 560 },
+    ],
   },
 };
 
-const WATER_TIPS = ['Inizia la giornata con 500ml appena sveglio', 'Bevi 500ml nelle 2h pre-allenamento', 'Durante la sessione: 200ml ogni 20 minuti', 'Post-workout: reintegra 1.5× il peso perso in sudore'];
+const WATER_TIPS = [
+  'Inizia la giornata con 500ml appena sveglio',
+  'Bevi 500ml nelle 2h pre-allenamento',
+  'Durante la sessione: 200ml ogni 20 min',
+  'Post-workout: reintegra 1.5× il peso perso',
+];
 
-const NutrizioneScreen: React.FC<NutrizioneScreenProps> = ({ userProfile, userStats, isDarkMode, themeColor, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'macros' | 'piano' | 'acqua'>('macros');
+type Tab = 'macros' | 'piano' | 'acqua';
+
+const NutrizioneScreen: React.FC<NutrizioneScreenProps> = ({ userProfile, isDarkMode, themeColor, onBack }) => {
+  const [activeTab, setActiveTab] = useState<Tab>('macros');
   const isRose = themeColor === 'rose';
-  const accent = isRose ? '#f43f5e' : '#10b981';
-  const accentBg = isRose ? 'bg-rose-500' : 'bg-emerald-500';
-  const accentText = isRose ? 'text-rose-400' : 'text-emerald-400';
+  const accent = isRose ? '#FF5D3B' : T.lime;
 
   const weight = userProfile.weight || 75;
-  const goal = userProfile.goal || 'muscle';
-  const theme = isDarkMode
-    ? { bg: 'bg-black', card: 'bg-[#1c1c1e] border-white/8', text: 'text-white', sub: 'text-zinc-400' }
-    : { bg: 'bg-gray-50', card: 'bg-white border-gray-100', text: 'text-gray-900', sub: 'text-gray-500' };
+  const goal   = userProfile.goal   || 'muscle';
 
-  // Calcola macros in base a obiettivo e peso
-  const macros = (() => {
-    const multipliers: Record<string, { kcal: number; protein: number; carbs: number; fat: number }> = {
+  const macros = useMemo(() => {
+    const m: Record<string, any> = {
       muscle:      { kcal: 36, protein: 2.2, carbs: 4.5, fat: 1.0 },
       definition:  { kcal: 29, protein: 2.4, carbs: 2.5, fat: 0.9 },
       weight_loss: { kcal: 24, protein: 2.0, carbs: 2.0, fat: 0.7 },
       endurance:   { kcal: 33, protein: 1.6, carbs: 5.5, fat: 0.8 },
     };
-    const m = multipliers[goal] || multipliers.muscle;
-    const kcal    = Math.round(weight * m.kcal);
-    const protein = Math.round(weight * m.protein);
-    const carbs   = Math.round(weight * m.carbs);
-    const fat     = Math.round(weight * m.fat);
-    return { kcal, protein, carbs, fat };
-  })();
+    const v = m[goal] || m.muscle;
+    return { kcal: Math.round(weight * v.kcal), protein: Math.round(weight * v.protein), carbs: Math.round(weight * v.carbs), fat: Math.round(weight * v.fat) };
+  }, [weight, goal]);
 
-  const waterLiters = (weight * 0.035 + (goal === 'endurance' ? 0.5 : 0.2)).toFixed(1);
-  const mealPlan = MEAL_PLANS[goal] || MEAL_PLANS.muscle;
-  const totalKcal = mealPlan.meals.reduce((a, m) => a + m.kcal, 0);
-
-  const MacroCard = ({ label, value, unit, color, pct }: { label: string; value: number; unit: string; color: string; pct: number }) => (
-    <div className={`rounded-2xl p-4 border ${theme.card}`}>
-      <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.sub} mb-2`}>{label}</p>
-      <p className="text-2xl font-black text-white">{value}<span className="text-sm font-medium text-zinc-500 ml-1">{unit}</span></p>
-      <div className="mt-3 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
-      </div>
-    </div>
-  );
+  const plan = MEAL_PLANS[goal] || MEAL_PLANS.muscle;
+  const totalMealKcal = plan.meals.reduce((a, m) => a + m.kcal, 0);
+  const card: React.CSSProperties = { background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 22 };
+  const tabs: { id: Tab; label: string; emoji: string }[] = [
+    { id: 'macros', label: 'Macros', emoji: '📊' },
+    { id: 'piano',  label: 'Piano',  emoji: '🍽️' },
+    { id: 'acqua',  label: 'Acqua',  emoji: '💧' },
+  ];
 
   return (
-    <div className={`min-h-screen ${theme.bg} pb-24`}>
-      {/* Header */}
-      <div className="px-5 pt-14 pb-4 flex items-center gap-3">
-        <button onClick={onBack} className={`w-10 h-10 rounded-full ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'} border flex items-center justify-center`}>
-          <ChevronLeft size={20} className={theme.text} />
+    <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.body, paddingBottom: 40 }}>
+
+      {/* HEADER */}
+      <div style={{ padding: '56px 20px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+        <button onClick={onBack} style={{ width: 40, height: 40, borderRadius: 14, background: T.bg2, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.text }}>
+          <ChevronLeft size={20} />
         </button>
         <div>
-          <h1 className={`text-xl font-black ${theme.text}`}>Nutrizione</h1>
-          <p className={`text-xs ${theme.sub}`}>Personalizzata per {mealPlan.name}</p>
-        </div>
-      </div>
-
-      {/* Calorie hero */}
-      <div className="mx-5 mb-4 rounded-3xl overflow-hidden relative" style={{ background: `linear-gradient(135deg, ${accent}20, ${accent}05)`, border: `1px solid ${accent}30` }}>
-        <div className="p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">Fabbisogno Giornaliero</p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-5xl font-black text-white">{macros.kcal}</span>
-            <span className="text-zinc-400 font-medium">kcal / giorno</span>
+          <div style={{ fontFamily: T.display, fontSize: 36, color: T.text, lineHeight: 1 }}>
+            NUTRIZIONE
           </div>
-          <p className="text-xs text-zinc-500 mt-2">Calcolato su {weight}kg • Obiettivo: {mealPlan.name}</p>
+          <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>
+            {plan.name} · {weight}kg
+          </div>
         </div>
-        <div className="absolute -right-4 -bottom-4 w-28 h-28 rounded-full opacity-10" style={{ backgroundColor: accent }} />
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 px-5 mb-4">
-        {(['macros', 'piano', 'acqua'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all ${
-              activeTab === tab ? `${accentBg} text-black` : `${isDarkMode ? 'bg-zinc-900 text-zinc-400' : 'bg-white text-gray-500'} border ${isDarkMode ? 'border-zinc-800' : 'border-gray-200'}`
-            }`}>
-            {tab === 'macros' ? '⚡ Macros' : tab === 'piano' ? '🍽 Piano' : '💧 Acqua'}
-          </button>
-        ))}
+      {/* TABS */}
+      <div style={{ display: 'flex', gap: 0, padding: '0 20px', marginBottom: 20 }}>
+        <div style={{ display: 'flex', background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 16, padding: 4, width: '100%' }}>
+          {tabs.map(({ id, label, emoji }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              style={{
+                flex: 1, padding: '10px 8px', borderRadius: 12, border: 'none',
+                background: activeTab === id ? T.bg3 : 'transparent',
+                color: activeTab === id ? T.text : T.muted,
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: T.body,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                boxShadow: activeTab === id ? '0 2px 8px rgba(0,0,0,0.4)' : 'none',
+                transition: 'all 0.2s',
+              }}
+            >
+              {emoji} {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="px-5 space-y-3">
+      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+        {/* MACROS TAB */}
         {activeTab === 'macros' && (
           <>
-            <div className="grid grid-cols-3 gap-2">
-              <MacroCard label="Proteine" value={macros.protein} unit="g" color="#10b981" pct={70} />
-              <MacroCard label="Carboidrati" value={macros.carbs} unit="g" color="#6366f1" pct={85} />
-              <MacroCard label="Grassi" value={macros.fat} unit="g" color="#f59e0b" pct={55} />
-            </div>
-
-            {/* Distribuzione calorie */}
-            <div className={`rounded-2xl p-4 border ${theme.card}`}>
-              <p className={`text-xs font-bold uppercase tracking-widest ${theme.sub} mb-3`}>Distribuzione Calorica</p>
-              <div className="flex h-4 rounded-full overflow-hidden gap-0.5">
-                <div className="h-full bg-emerald-500 rounded-l-full" style={{ width: `${Math.round((macros.protein * 4 / macros.kcal) * 100)}%` }} />
-                <div className="h-full bg-indigo-500" style={{ width: `${Math.round((macros.carbs * 4 / macros.kcal) * 100)}%` }} />
-                <div className="h-full bg-amber-500 rounded-r-full flex-1" />
-              </div>
-              <div className="flex justify-between mt-2">
-                {[['Proteine', '#10b981', `${Math.round((macros.protein * 4 / macros.kcal) * 100)}%`],
-                  ['Carbo', '#6366f1', `${Math.round((macros.carbs * 4 / macros.kcal) * 100)}%`],
-                  ['Grassi', '#f59e0b', `${Math.round((macros.fat * 9 / macros.kcal) * 100)}%`]].map(([label, color, pct]) => (
-                  <div key={label as string} className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color as string }} />
-                    <span className="text-[10px] text-zinc-500 font-medium">{label} {pct}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className={`rounded-2xl p-4 border ${theme.card}`}>
-              <div className="flex items-start gap-3">
-                <Info size={16} className={`${accentText} mt-0.5 shrink-0`} />
+            {/* Kcal hero */}
+            <div style={{ ...card, padding: '22px 22px 18px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 6 }}>Fabbisogno Calorico</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                 <div>
-                  <p className={`text-xs font-bold ${theme.text} mb-1`}>Come usare questi numeri</p>
-                  <p className={`text-xs ${theme.sub} leading-relaxed`}>
-                    Distribuisci le proteine in 4–5 pasti da ~{Math.round(macros.protein / 5)}g ciascuno per massimizzare la sintesi proteica muscolare. I carboidrati concentrali attorno all'allenamento.
-                  </p>
+                  <span style={{ fontFamily: T.display, fontSize: 72, color: accent, lineHeight: 1 }}>{macros.kcal}</span>
+                  <span style={{ fontSize: 15, color: T.muted, marginLeft: 8, fontWeight: 500 }}>kcal / giorno</span>
                 </div>
+                <div style={{ fontSize: 36 }}>🔥</div>
+              </div>
+              {/* Macro bar */}
+              <div style={{ marginTop: 16 }}>
+                <div style={{ height: 6, borderRadius: 100, overflow: 'hidden', display: 'flex', gap: 2 }}>
+                  <div style={{ flex: macros.protein * 4, background: T.lime, borderRadius: 100 }} />
+                  <div style={{ flex: macros.carbs * 4, background: T.violet, borderRadius: 100 }} />
+                  <div style={{ flex: macros.fat * 9, background: T.amber, borderRadius: 100 }} />
+                </div>
+                <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                  {[
+                    { label: 'P', pct: Math.round(macros.protein * 4 / macros.kcal * 100), color: T.lime },
+                    { label: 'C', pct: Math.round(macros.carbs * 4 / macros.kcal * 100), color: T.violet },
+                    { label: 'G', pct: Math.round(macros.fat * 9 / macros.kcal * 100), color: T.amber },
+                  ].map(({ label, pct, color }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+                      <span style={{ fontSize: 11, color: T.muted }}>{label} {pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Macro cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {[
+                { label: 'Proteine', value: macros.protein, unit: 'g', icon: '🥩', color: T.lime,   desc: `${(macros.protein / weight).toFixed(1)}g/kg` },
+                { label: 'Carboidrati', value: macros.carbs, unit: 'g', icon: '🌾', color: T.violet, desc: 'Fonte energetica' },
+                { label: 'Grassi',    value: macros.fat,   unit: 'g', icon: '🫒', color: T.amber,  desc: 'Ormoni e salute' },
+              ].map(({ label, value, unit, icon, color, desc }) => (
+                <div key={label} style={{ ...card, padding: '16px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>{icon}</div>
+                  <div style={{ fontFamily: T.display, fontSize: 30, color, lineHeight: 1 }}>{value}<span style={{ fontSize: 10, color: T.muted }}>{unit}</span></div>
+                  <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.muted, marginTop: 4 }}>{label}</div>
+                  <div style={{ fontSize: 10, color: T.muted2, marginTop: 4 }}>{desc}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tip */}
+            <div style={{ background: 'rgba(200,255,0,0.06)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: 16, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, color: T.muted2, lineHeight: 1.6 }}>
+                💡 <strong style={{ color: T.text }}>Consiglio:</strong> Distribuisci le proteine in 5-6 pasti. Il corpo ne assorbe circa 40g per pasto.
               </div>
             </div>
           </>
         )}
 
+        {/* PIANO TAB */}
         {activeTab === 'piano' && (
           <>
-            <div className={`rounded-2xl p-3 border ${theme.card}`}>
-              <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.sub} mb-1`}>Totale stimato piano</p>
-              <p className={`text-lg font-black ${theme.text}`}>{totalKcal} kcal <span className={`text-sm font-normal ${theme.sub}`}>vs target {macros.kcal} kcal</span></p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: T.text }}>Piano {plan.name}</div>
+              <div style={{ fontSize: 11, color: T.muted }}>{totalMealKcal} kcal totali</div>
             </div>
-            {mealPlan.meals.map((meal, i) => (
-              <div key={i} className={`rounded-2xl p-4 border ${theme.card} flex items-start gap-4`}>
-                <div className="shrink-0 text-center">
-                  <p className={`text-[10px] font-bold ${theme.sub} font-mono`}>{meal.time}</p>
+
+            {plan.meals.map((meal, i) => (
+              <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                {/* Timeline */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 52, flexShrink: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: accent, fontFamily: "'DM Mono', monospace" }}>{meal.time}</div>
+                  {i < plan.meals.length - 1 && <div style={{ width: 1, flex: 1, minHeight: 20, background: T.border, margin: '4px 0' }} />}
                 </div>
-                <div className="flex-1">
-                  <p className={`font-bold text-sm ${theme.text}`}>{meal.title}</p>
-                  <p className={`text-xs ${theme.sub} mt-0.5 leading-relaxed`}>{meal.desc}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <span className={`text-xs font-bold ${accentText}`}>{meal.kcal}</span>
-                  <p className={`text-[9px] ${theme.sub}`}>kcal</p>
+                {/* Card */}
+                <div style={{ ...card, flex: 1, padding: '14px 16px', marginBottom: i < plan.meals.length - 1 ? 4 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: T.text }}>{meal.title}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: accent }}>{meal.kcal} kcal</div>
+                  </div>
+                  <div style={{ fontSize: 12, color: T.muted2, lineHeight: 1.4 }}>{meal.desc}</div>
                 </div>
               </div>
             ))}
-            <div className={`rounded-xl p-3 border ${isDarkMode ? 'bg-zinc-900/50 border-zinc-800' : 'bg-gray-50 border-gray-200'}`}>
-              <p className={`text-[10px] ${theme.sub} text-center`}>💡 Piano indicativo. Adatta le porzioni alle tue preferenze.</p>
-            </div>
           </>
         )}
 
+        {/* ACQUA TAB */}
         {activeTab === 'acqua' && (
           <>
-            <div className="rounded-3xl p-6 text-center" style={{ background: `linear-gradient(135deg, #3b82f620, #1e40af10)`, border: '1px solid #3b82f630' }}>
-              <Droplets size={36} className="text-blue-400 mx-auto mb-3" />
-              <p className="text-6xl font-black text-white">{waterLiters}</p>
-              <p className="text-blue-400 font-bold mt-1">litri al giorno</p>
-              <p className="text-zinc-500 text-xs mt-2">Calcolato su {weight}kg di peso corporeo</p>
-            </div>
-            <div className={`rounded-2xl p-4 border ${theme.card}`}>
-              <p className={`text-xs font-bold uppercase tracking-widest ${theme.sub} mb-3`}>Distribuzione ottimale</p>
-              <div className="space-y-3">
-                {WATER_TIPS.map((tip, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-blue-400 text-[10px] font-black">{i+1}</span>
-                    </div>
-                    <p className={`text-xs ${theme.sub} leading-relaxed flex-1`}>{tip}</p>
-                  </div>
-                ))}
+            {/* Daily target */}
+            <div style={{ ...card, padding: '22px 22px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted, marginBottom: 6 }}>Obiettivo Giornaliero</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                <div>
+                  <span style={{ fontFamily: T.display, fontSize: 72, color: T.sky, lineHeight: 1 }}>
+                    {(weight * 0.033).toFixed(1)}
+                  </span>
+                  <span style={{ fontSize: 15, color: T.muted, marginLeft: 8 }}>litri / giorno</span>
+                </div>
+                <div style={{ fontSize: 36 }}>💧</div>
+              </div>
+              <div style={{ marginTop: 12, fontSize: 11, color: T.muted }}>
+                Basato sul tuo peso: {weight}kg × 33ml/kg
               </div>
             </div>
-            <div className={`rounded-2xl p-4 border ${theme.card}`}>
-              <p className={`text-xs font-bold ${theme.text} mb-2`}>🚨 Segnali di disidratazione</p>
-              <div className="flex flex-wrap gap-2">
-                {['Urine scure', 'Crampi', 'Stanchezza', 'Mal di testa', 'Calo performance'].map(s => (
-                  <span key={s} className="text-[10px] font-bold bg-red-500/10 text-red-400 px-2 py-1 rounded-full border border-red-500/20">{s}</span>
-                ))}
+
+            {/* Tips */}
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>CONSIGLI DI IDRATAZIONE</div>
+            {WATER_TIPS.map((tip, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', ...card, padding: '14px 16px' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 9, background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>💧</div>
+                <div style={{ fontSize: 13, color: T.muted2, lineHeight: 1.5 }}>{tip}</div>
+              </div>
+            ))}
+
+            {/* Electrolytes reminder */}
+            <div style={{ background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.15)', borderRadius: 16, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, color: T.muted2, lineHeight: 1.6 }}>
+                ⚡ <strong style={{ color: T.text }}>Elettroliti:</strong> Dopo allenamenti intensi (60+ min), considera acqua con elettroliti o una banana per il potassio.
               </div>
             </div>
           </>
