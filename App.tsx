@@ -6,6 +6,7 @@ import WorkoutDetailScreen from './screens/WorkoutDetailScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import ProfileConfigScreen from './screens/ProfileConfigScreen';
 import GoalSelectionScreen from './screens/GoalSelectionScreen';
+import NutrizioneScreen from './screens/NutrizioneScreen';
 import StrengthTestScreen from './screens/StrengthTestScreen';
 import PreferencesScreen from './screens/PreferencesScreen';
 import PlanGenerationScreen from './screens/PlanGenerationScreen';
@@ -399,10 +400,19 @@ const App: React.FC = () => {
         setUserProfile(p => ({ ...p, ...d }));
         setCurrentScreen('goal-selection');
       }} onSkip={() => {}} />;
-      case 'goal-selection': return <GoalSelectionScreen onFinish={(g) => {
-        setupProfileRef.current = { ...setupProfileRef.current, goal: g };
+      case 'goal-selection': return <GoalSelectionScreen onFinish={(g, experience, equipment, frequency) => {
+        setupProfileRef.current = { ...setupProfileRef.current, goal: g, experience, equipment };
         setUserProfile(p => ({ ...p, goal: g }));
         if (g === 'custom') setupProfileRef.current = { ...setupProfileRef.current, currentPlan: [] };
+        // Se hanno selezionato una frequenza, pre-imposta i giorni
+        if (frequency) {
+          const dayMap: Record<number, number[]> = {
+            2: [1, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [0,1,2,3,4,5]
+          };
+          const days = dayMap[frequency] || [1, 3, 5];
+          setupProfileRef.current = { ...setupProfileRef.current, trainingDays: days };
+          setUserProfile(p => ({ ...p, trainingDays: days }));
+        }
         setCurrentScreen('strength-test');
       }} />;
       case 'strength-test': return <StrengthTestScreen onNext={(d) => {
@@ -472,6 +482,7 @@ const App: React.FC = () => {
         userProfile={userProfile} userStats={userStats}
         isDarkMode={isDarkMode} toggleTheme={toggleDarkMode}
         onEditProfile={() => setCurrentScreen('profile-config')}
+        onNavigate={setCurrentScreen}
         themeColor={themeColor} workoutSchedule={workoutSchedule}
         onDeleteWorkout={(id, date) => handleDeleteWorkout(id)}
         onProfileUpdated={(profileUpdates, statsUpdates) => {
@@ -505,6 +516,12 @@ const App: React.FC = () => {
         initialWorkout={editingWorkout?.workout || null}
         isDarkMode={isDarkMode}
         themeColor={themeColor} />;
+      case 'nutrizione': return <NutrizioneScreen
+        userProfile={userProfile}
+        userStats={userStats}
+        isDarkMode={isDarkMode}
+        themeColor={themeColor}
+        onBack={() => setCurrentScreen('profile')} />;
       default: return <LoginScreen onLogin={() => {}} />;
     }
   };

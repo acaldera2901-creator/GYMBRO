@@ -360,6 +360,10 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [completedSets, setCompletedSets] = useState<Set<string>>(new Set());
+  // Cedimento: "idx-setIdx" → true se l'utente ha raggiunto il cedimento su quella serie
+  const [failureSets, setFailureSets] = useState<Set<string>>(new Set());
+  // Drop set: "idx-setIdx" → true se l'utente ha eseguito un drop set
+  const [dropSets, setDropSets] = useState<Set<string>>(new Set());
 
   const [isResting, setIsResting] = useState(false);
   const [isRestPaused, setIsRestPaused] = useState(false); 
@@ -497,6 +501,8 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
       setActiveWorkout(null); 
       setElapsedSeconds(0); 
       setCompletedSets(new Set());
+      setFailureSets(new Set());
+      setDropSets(new Set());
   };
 
   if (isSessionActive && activeWorkout) {
@@ -568,28 +574,88 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                       const setsCount = match ? Math.max(1, Math.min(6, parseInt(match[1]))) : 3;
                       const setsCompleted = Array.from({length: setsCount}).filter((_, si) => completedSets.has(`${idx}-${si}`)).length;
                       const isFullyDone = setsCompleted === setsCount;
+                      // Conta cedimenti su questo esercizio
+                      const failureCount = Array.from({length: setsCount}).filter((_, si) => failureSets.has(`${idx}-${si}`)).length;
                       return (
-                          <div key={idx} className={`rounded-[1.5rem] p-5 border transition-all duration-300 ${isFullyDone ? 'bg-zinc-900/50 border-white/5 opacity-60' : 'bg-[#1c1c1e] border-white/10 shadow-lg'}`}>
-                              <div className="flex justify-between items-start mb-5">
-                                  <div>
-                                    <h3 className={`text-xl font-bold ${isFullyDone ? 'text-zinc-500' : 'text-white'}`}>{ex.name}</h3>
-                                    <p className="text-zinc-500 text-xs font-medium uppercase mt-1 tracking-wide">{ex.reps}</p>
-                                  </div>
-                                  {isFullyDone && <div className="bg-emerald-500/20 text-emerald-500 p-1.5 rounded-full"><CheckCircle2 size={16}/></div>}
+                          <div key={idx} className={`rounded-[1.5rem] border transition-all duration-300 overflow-hidden ${isFullyDone ? 'bg-zinc-900/50 border-white/5 opacity-70' : 'bg-[#1c1c1e] border-white/10 shadow-lg'}`}>
+                              <div className="p-5 pb-4">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                      <h3 className={`text-xl font-bold ${isFullyDone ? 'text-zinc-500' : 'text-white'}`}>{ex.name}</h3>
+                                      <p className="text-zinc-500 text-xs font-medium uppercase mt-1 tracking-wide">{ex.reps}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {failureCount > 0 && (
+                                        <span className="text-[10px] font-black bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
+                                          ⚡ {failureCount} cedim.
+                                        </span>
+                                      )}
+                                      {isFullyDone && <div className="bg-emerald-500/20 text-emerald-500 p-1.5 rounded-full"><CheckCircle2 size={16}/></div>}
+                                    </div>
+                                </div>
+                                {/* Set buttons */}
+                                <div className="flex gap-2">
+                                    {Array.from({length: setsCount}).map((_, setIdx) => {
+                                        const key = `${idx}-${setIdx}`;
+                                        const isDone = completedSets.has(key);
+                                        const isFailure = failureSets.has(key);
+                                        const isDrop = dropSets.has(key);
+                                        return (
+                                            <div key={setIdx} className="flex-1 flex flex-col gap-1.5">
+                                              <button
+                                                onClick={() => handleSetCompletion(idx, setIdx)}
+                                                className={`h-12 rounded-xl font-bold flex items-center justify-center transition-all duration-200 text-sm w-full ${
+                                                  isDone
+                                                    ? isFailure
+                                                      ? 'bg-amber-500 text-black shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                                                      : isDrop
+                                                      ? 'bg-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+                                                      : 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                                                }`}>
+                                                {isDone
+                                                  ? isFailure ? '⚡' : isDrop ? 'DROP' : <CheckCircle2 size={18} />
+                                                  : <span className="text-xs">{setIdx + 1}</span>
+                                                }
+                                              </button>
+                                              {/* Bottoni cedimento/dropset — visibili solo se la serie è completata */}
+                                              {isDone && (
+                                                <div className="flex gap-1">
+                                                  <button
+                                                    onClick={() => setFailureSets(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                                                    className={`flex-1 h-6 rounded-lg text-[9px] font-black transition-all ${isFailure ? 'bg-amber-500/30 text-amber-400 border border-amber-500/40' : 'bg-zinc-800 text-zinc-600 hover:text-amber-400'}`}>
+                                                    ⚡
+                                                  </button>
+                                                  <button
+                                                    onClick={() => setDropSets(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                                                    className={`flex-1 h-6 rounded-lg text-[9px] font-black transition-all ${isDrop ? 'bg-purple-500/30 text-purple-400 border border-purple-500/40' : 'bg-zinc-800 text-zinc-600 hover:text-purple-400'}`}>
+                                                    ↓
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                               </div>
-                              <div className="flex gap-2.5">
-                                  {Array.from({length: setsCount}).map((_, setIdx) => {
-                                      const isDone = completedSets.has(`${idx}-${setIdx}`);
-                                      return (
-                                          <button key={setIdx} onClick={() => handleSetCompletion(idx, setIdx)} className={`flex-1 h-12 rounded-lg font-bold flex items-center justify-center transition-all duration-200 text-sm ${isDone ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}>
-                                              {isDone ? <CheckCircle2 size={20} /> : `Set ${setIdx + 1}`}
-                                          </button>
-                                      )
-                                  })}
-                              </div>
+                              {/* Legenda inline */}
+                              {isFullyDone && (failureCount > 0 || Array.from({length: setsCount}).some((_, si) => dropSets.has(`${idx}-${si}`))) && (
+                                <div className="px-5 pb-3 flex gap-3">
+                                  {failureCount > 0 && <span className="text-[10px] text-amber-500/70">⚡ Cedimento = massimo sforzo raggiunto</span>}
+                                  {Array.from({length: setsCount}).some((_, si) => dropSets.has(`${idx}-${si}`)) && <span className="text-[10px] text-purple-500/70">↓ Drop set = peso ridotto, continuato</span>}
+                                </div>
+                              )}
                           </div>
                       );
                   })}
+                  {/* Legenda globale */}
+                  <div className="bg-zinc-900/50 rounded-xl p-3 border border-zinc-800">
+                    <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest mb-1.5">Tecniche Avanzate</p>
+                    <div className="flex gap-4">
+                      <span className="text-[11px] text-zinc-500">⚡ <span className="text-amber-400">Cedimento</span> — raggiungi il limite</span>
+                      <span className="text-[11px] text-zinc-500">↓ <span className="text-purple-400">Drop Set</span> — riduci e continua</span>
+                    </div>
+                  </div>
                   <div className="h-10"></div>
               </div>
           </div>

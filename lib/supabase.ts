@@ -5,8 +5,7 @@ const SUPABASE_URL = 'https://sxjswqsonbkbxcvrbmnr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4anN3cXNvbmJrYnhjdnJibW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzI4MDIsImV4cCI6MjA4NzgwODgwMn0.KoyckZvphg7Af4mpRvT_bwTjZiFNQH_w3phq9hmk8bI';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
-    db: { schema: 'public' }
+    auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
 });
 
 const getValidSession = async () => {

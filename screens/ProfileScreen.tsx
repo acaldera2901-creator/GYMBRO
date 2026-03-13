@@ -15,6 +15,7 @@ interface ProfileScreenProps {
   isDarkMode: boolean;
   toggleTheme: () => void;
   onEditProfile: () => void;
+  onNavigate?: (screen: string) => void;
   themeColor: string;
   workoutSchedule?: Record<string, WorkoutCard[]>;
   onDeleteWorkout?: (id: string, date: string) => void;
@@ -229,7 +230,7 @@ const EditProfileModal: React.FC<{
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onLogout, userProfile, userStats, isDarkMode, toggleTheme,
-  onEditProfile, themeColor, workoutSchedule = {}, onDeleteWorkout, onProfileUpdated
+  onEditProfile, onNavigate, themeColor, workoutSchedule = {}, onDeleteWorkout, onProfileUpdated
 }) => {
   const [showEdit, setShowEdit] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
@@ -512,7 +513,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </div>
             </div>
           </div>
-          <button onClick={onLogout} className={`w-full mt-4 py-3.5 text-red-500 text-sm font-medium ${isDarkMode ? "bg-zinc-900/60 border-zinc-800/50" : "bg-white border-slate-200 shadow-sm"} hover:bg-red-500/10 rounded-2xl border transition-colors`}>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('nutrizione')}
+              className={`w-full mt-3 py-3.5 rounded-2xl border flex items-center justify-center gap-2 text-sm font-bold transition-colors ${isDarkMode ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20' : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'}`}>
+              🥗 Piano Nutrizionale
+            </button>
+          )}
+          <button onClick={onLogout} className={`w-full mt-3 py-3.5 text-red-500 text-sm font-medium ${isDarkMode ? "bg-zinc-900/60 border-zinc-800/50" : "bg-white border-slate-200 shadow-sm"} hover:bg-red-500/10 rounded-2xl border transition-colors`}>
             Esci dall'account
           </button>
         </div>

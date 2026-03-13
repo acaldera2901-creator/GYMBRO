@@ -1,5 +1,5 @@
 
-export type ScreenName = 'login' | 'profile-config' | 'goal-selection' | 'strength-test' | 'preferences' | 'plan-generation' | 'home' | 'calendar' | 'workout' | 'profile' | 'community' | 'custom-workout-builder';
+export type ScreenName = 'login' | 'profile-config' | 'goal-selection' | 'strength-test' | 'preferences' | 'plan-generation' | 'home' | 'calendar' | 'workout' | 'profile' | 'community' | 'custom-workout-builder' | 'nutrizione';
 
 export type CategoryType = 'Massa' | 'Definizione' | 'Perdita Peso' | 'Resistenza' | 'Custom';
 export type BadgeTier = 'locked' | 'bronze' | 'silver' | 'gold' | 'diamond' | 'legendary';
