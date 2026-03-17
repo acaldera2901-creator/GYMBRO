@@ -72,6 +72,7 @@ const App: React.FC = () => {
   const [tempChallengeData, setTempChallengeData] = useState<Challenge | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
   const [previousScreen, setPreviousScreen] = useState<ScreenName>('home');
+  const [editingWorkout, setEditingWorkout] = useState<{ workout: WorkoutCard } | null>(null);
   const [showCoachMarks, setShowCoachMarks] = useState(false);
   const [showBadgeUnlock, setShowBadgeUnlock] = useState<Badge | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -687,28 +688,31 @@ const App: React.FC = () => {
               if (idx >= 0) { const u = [...prev]; u[idx] = workout; return u; }
               return [workout, ...prev];
             });
+
+            // Calcola il piano aggiornato ORA (sincrono) per evitare race condition
+            // con React state — setUserProfile è async, non possiamo leggerlo subito dopo
             setUserProfile(p => {
               const plan = p.currentPlan || [];
               const idx = plan.findIndex(w => w.id === workout.id);
-              const updated = idx >= 0
+              const updatedPlan = idx >= 0
                 ? plan.map(w => w.id === workout.id ? workout : w)
                 : [workout, ...plan];
-              return { ...p, currentPlan: updated };
+
+              // Persisti sul DB in background con il piano già corretto
+              if (sessionUserId) {
+                saveCustomWorkout(sessionUserId, workout)
+                  .catch(e => console.error('saveCustomWorkout failed:', e));
+                saveCurrentPlan(sessionUserId, updatedPlan)
+                  .catch(e => console.error('saveCurrentPlan failed:', e));
+              }
+
+              return { ...p, currentPlan: updatedPlan };
             });
-            // Naviga subito — lo smontaggio avviene qui
+
+            // Naviga subito
             setEditingWorkout(null);
             setSelectedWorkoutId(workout.id);
             setCurrentScreen('workout');
-            // Persisti sul DB in background (fire-and-forget, non bloccante)
-            if (sessionUserId) {
-              saveCustomWorkout(sessionUserId, workout).catch(console.error);
-              // Leggi il piano aggiornato dallo stato per salvarlo
-              setUserProfile(p => {
-                const updated = p.currentPlan || [];
-                saveCurrentPlan(sessionUserId, updated).catch(console.error);
-                return p; // non modificare lo stato, solo leggere
-              });
-            }
           }}
           initialWorkout={editingWorkout?.workout || null}
           isDarkMode={isDarkMode}
