@@ -361,6 +361,10 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [completedSets, setCompletedSets] = useState<Set<string>>(new Set());
+  // Cedimento: "idx-setIdx" → true se la serie è andata a cedimento
+  const [failureSets, setFailureSets] = useState<Set<string>>(new Set());
+  // Drop set: "idx-setIdx" → peso ridotto e continuato
+  const [dropSets, setDropSets] = useState<Set<string>>(new Set());
 
   const [isResting, setIsResting] = useState(false);
   const [isRestPaused, setIsRestPaused] = useState(false); 
@@ -515,6 +519,8 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
       setIsResting(false);
       setElapsedSeconds(0);
       setCompletedSets(new Set());
+      setFailureSets(new Set());
+      setDropSets(new Set());
       setRestTimeRemaining(0);
   };
 
@@ -580,35 +586,96 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
               
               <div className="flex-1 overflow-y-auto px-5 pt-28 pb-32 space-y-4">
                   {activeWorkout.exercises.map((ex, idx) => {
-                      // Parsa il numero di serie dal campo reps (null-safe): "4 x 6-8 @ 60kg" → 4
                       const repsStr = ex.reps ?? '';
                       const clean = repsStr.split('@')[0].trim();
                       const match = clean.match(/^(\d+)\s*[x×X]/i);
                       const setsCount = match ? Math.max(1, Math.min(6, parseInt(match[1]))) : 3;
                       const setsCompleted = Array.from({length: setsCount}).filter((_, si) => completedSets.has(`${idx}-${si}`)).length;
                       const isFullyDone = setsCompleted === setsCount;
+                      const failureCount = Array.from({length: setsCount}).filter((_, si) => failureSets.has(`${idx}-${si}`)).length;
                       return (
-                          <div key={idx} className={`rounded-[1.5rem] p-5 border transition-all duration-300 ${isFullyDone ? 'bg-zinc-900/50 border-white/5 opacity-60' : 'bg-[#1c1c1e] border-white/10 shadow-lg'}`}>
-                              <div className="flex justify-between items-start mb-5">
-                                  <div>
-                                    <h3 className={`text-xl font-bold ${isFullyDone ? 'text-zinc-500' : 'text-white'}`}>{ex.name}</h3>
-                                    <p className="text-zinc-500 text-xs font-medium uppercase mt-1 tracking-wide">{ex.reps}</p>
+                          <div key={idx} className={`rounded-[1.5rem] border transition-all duration-300 overflow-hidden ${isFullyDone ? 'bg-zinc-900/50 border-white/5 opacity-70' : 'bg-[#1c1c1e] border-white/10 shadow-lg'}`}>
+                              <div className="p-5 pb-4">
+                                  <div className="flex justify-between items-start mb-4">
+                                      <div>
+                                          <h3 className={`text-xl font-bold ${isFullyDone ? 'text-zinc-500' : 'text-white'}`}>{ex.name}</h3>
+                                          <p className="text-zinc-500 text-xs font-medium uppercase mt-1 tracking-wide">{ex.reps}</p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                          {failureCount > 0 && (
+                                              <span className="text-[10px] font-black bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
+                                                  ⚡ {failureCount} cedim.
+                                              </span>
+                                          )}
+                                          {isFullyDone && <div className="bg-emerald-500/20 text-emerald-500 p-1.5 rounded-full"><CheckCircle2 size={16}/></div>}
+                                      </div>
                                   </div>
-                                  {isFullyDone && <div className="bg-emerald-500/20 text-emerald-500 p-1.5 rounded-full"><CheckCircle2 size={16}/></div>}
-                              </div>
-                              <div className="flex gap-2.5">
-                                  {Array.from({length: setsCount}).map((_, setIdx) => {
-                                      const isDone = completedSets.has(`${idx}-${setIdx}`);
-                                      return (
-                                          <button key={setIdx} onClick={() => handleSetCompletion(idx, setIdx)} className={`flex-1 h-12 rounded-lg font-bold flex items-center justify-center transition-all duration-200 text-sm ${isDone ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}>
-                                              {isDone ? <CheckCircle2 size={20} /> : `Set ${setIdx + 1}`}
-                                          </button>
-                                      )
-                                  })}
+                                  {/* Set buttons */}
+                                  <div className="flex gap-2">
+                                      {Array.from({length: setsCount}).map((_, setIdx) => {
+                                          const key = `${idx}-${setIdx}`;
+                                          const isDone    = completedSets.has(key);
+                                          const isFailure = failureSets.has(key);
+                                          const isDrop    = dropSets.has(key);
+                                          return (
+                                              <div key={setIdx} className="flex-1 flex flex-col gap-1.5">
+                                                  {/* Bottone serie principale */}
+                                                  <button
+                                                      onClick={() => handleSetCompletion(idx, setIdx)}
+                                                      className={`h-12 rounded-xl font-bold flex items-center justify-center transition-all duration-200 text-sm w-full ${
+                                                          isDone
+                                                              ? isFailure
+                                                                  ? 'bg-amber-500 text-black shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                                                                  : isDrop
+                                                                  ? 'bg-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+                                                                  : 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                                                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                                                      }`}
+                                                  >
+                                                      {isDone
+                                                          ? isFailure ? '⚡' : isDrop ? '↓' : <CheckCircle2 size={18} />
+                                                          : <span className="text-xs font-bold">{setIdx + 1}</span>
+                                                      }
+                                                  </button>
+                                                  {/* Cedimento + Drop — visibili solo dopo aver completato la serie */}
+                                                  {isDone && (
+                                                      <div className="flex gap-1">
+                                                          <button
+                                                              onClick={() => setFailureSets(prev => {
+                                                                  const n = new Set(prev);
+                                                                  n.has(key) ? n.delete(key) : n.add(key);
+                                                                  return n;
+                                                              })}
+                                                              title="Cedimento muscolare"
+                                                              className={`flex-1 h-6 rounded-lg text-[10px] font-black transition-all ${isFailure ? 'bg-amber-500/30 text-amber-400 border border-amber-500/40' : 'bg-zinc-800 text-zinc-600 hover:text-amber-400'}`}
+                                                          >⚡</button>
+                                                          <button
+                                                              onClick={() => setDropSets(prev => {
+                                                                  const n = new Set(prev);
+                                                                  n.has(key) ? n.delete(key) : n.add(key);
+                                                                  return n;
+                                                              })}
+                                                              title="Drop set"
+                                                              className={`flex-1 h-6 rounded-lg text-[10px] font-black transition-all ${isDrop ? 'bg-purple-500/30 text-purple-400 border border-purple-500/40' : 'bg-zinc-800 text-zinc-600 hover:text-purple-400'}`}
+                                                          >↓</button>
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          );
+                                      })}
+                                  </div>
                               </div>
                           </div>
                       );
                   })}
+                  {/* Legenda tecniche */}
+                  <div className="bg-zinc-900/50 rounded-xl p-3 border border-zinc-800">
+                      <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest mb-1.5">Tecniche Avanzate</p>
+                      <div className="flex gap-4">
+                          <span className="text-[11px] text-zinc-500">⚡ <span className="text-amber-400">Cedimento</span> — al limite muscolare</span>
+                          <span className="text-[11px] text-zinc-500">↓ <span className="text-purple-400">Drop Set</span> — peso ridotto, continua</span>
+                      </div>
+                  </div>
                   <div className="h-10"></div>
               </div>
           </div>

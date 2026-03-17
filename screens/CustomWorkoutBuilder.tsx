@@ -7,10 +7,10 @@ import { WorkoutCard, CategoryType } from '../types';
 
 interface CustomWorkoutBuilderProps {
   onBack: () => void;
-  onSave: (workout: WorkoutCard) => void;
+  onSave: (workout: WorkoutCard) => void | Promise<void>;
   isDarkMode: boolean;
   themeColor: string;
-  initialWorkout?: WorkoutCard | null; // per edit mode
+  initialWorkout?: WorkoutCard | null;
 }
 
 const CATEGORY_OPTIONS: { value: CategoryType; label: string; emoji: string; color: string }[] = [
