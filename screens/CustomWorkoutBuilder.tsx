@@ -126,25 +126,26 @@ const CustomWorkoutBuilder: React.FC<CustomWorkoutBuilderProps> = ({
     else if (step === 'exercises') setStep('review');
   };
 
-  const handleSave = () => {
-    const workout: WorkoutCard = {
-      // Se stiamo editando, preserva l'ID originale (upsert invece di insert)
-      id: initialWorkout?.id || `custom_${Date.now()}`,
-      category,
-      title: title.trim(),
-      focus: focus.trim() || 'Scheda personalizzata',
-      exercises: exercises
-        .filter(e => e.name.trim())
-        .map(e => ({
-          name: e.name.trim(),
-          reps: `${e.sets} x ${e.reps} (Rec. ${e.rest}")`,
-        })),
-      isCustom: true,
-      affinityScore: 100,
-    };
-    setSaved(true);
-    setTimeout(() => { onSave(workout); }, 500);
+  // In CustomWorkoutBuilder.tsx - handleSave
+const handleSave = async () => {
+  const workout: WorkoutCard = {
+    id: initialWorkout?.id || `custom_${Date.now()}`,
+    category,
+    title: title.trim(),
+    focus: focus.trim() || 'Scheda personalizzata',
+    exercises: exercises
+      .filter(e => e.name.trim())
+      .map(e => ({
+        name: e.name.trim(),
+        reps: `${e.sets} x ${e.reps} (Rec. ${e.rest}")`,
+      })),
+    isCustom: true,
+    affinityScore: 100,
   };
+  setSaved(true);
+  // Niente setTimeout - chiama onSave direttamente
+  await onSave(workout);
+};
 
   const selectedCat = CATEGORY_OPTIONS.find(c => c.value === category) || CATEGORY_OPTIONS[4];
 
