@@ -40,13 +40,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [workoutIdx, setWorkoutIdx] = useState(0);
 
-  useEffect(() => {
-    if (availableWorkouts.length <= 1) return;
-    const t = setInterval(() => setWorkoutIdx(p => (p + 1) % availableWorkouts.length), 5000);
-    return () => clearInterval(t);
-  }, [availableWorkouts.length]);
+  // BUG FIX #10b: il carosello "oggi" deve ciclare solo sulle schede non completate
+  const freshWorkouts = useMemo(() => availableWorkouts.filter(w => !w.isCompleted), [availableWorkouts]);
 
-  const todayWorkout = availableWorkouts.length > 0 ? availableWorkouts[workoutIdx] : null;
+  useEffect(() => {
+    if (freshWorkouts.length <= 1) return;
+    const t = setInterval(() => setWorkoutIdx(p => (p + 1) % freshWorkouts.length), 5000);
+    return () => clearInterval(t);
+  }, [freshWorkouts.length]);
+
+  const todayWorkout = freshWorkouts.length > 0 ? freshWorkouts[workoutIdx] : null;
 
   const todayLabel = useMemo(() => {
     return new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -221,7 +224,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
         <div className="space-y-2">
-          {availableWorkouts.slice(0, 3).map(w => {
+          {/* BUG FIX #10: filtra le schede completate dalla libreria home.
+              Le schede con isCompleted=true sono sessioni già fatte, non schede
+              della libreria — mostrarle confonde l'utente e può riavviarle. */}
+          {availableWorkouts.filter(w => !w.isCompleted).slice(0, 3).map(w => {
             const catColors: Record<string, string> = {
               'Massa': '#10b981', 'Definizione': '#8b5cf6',
               'Perdita Peso': '#f97316', 'Resistenza': '#3b82f6', 'Custom': '#a855f7'
@@ -255,10 +261,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         const goal   = userProfile.goal || 'muscle';
         const weight = userProfile.weight;
         const mult: Record<string, { kcal: number; protein: number; carbs: number; fat: number }> = {
-          muscle:      { kcal: 36,  protein: 2.2, carbs: 4.5, fat: 1.0 },
-          definition:  { kcal: 29,  protein: 2.4, carbs: 2.5, fat: 0.9 },
-          weight_loss: { kcal: 24,  protein: 2.0, carbs: 2.0, fat: 0.7 },
-          endurance:   { kcal: 33,  protein: 1.6, carbs: 5.5, fat: 0.8 },
+          muscle:      { kcal: 36, protein: 2.2, carbs: 4.5, fat: 1.0 },
+          definition:  { kcal: 29, protein: 2.4, carbs: 2.5, fat: 0.9 },
+          weight_loss: { kcal: 24, protein: 2.0, carbs: 2.0, fat: 0.7 },
+          endurance:   { kcal: 33, protein: 1.6, carbs: 5.5, fat: 0.8 },
         };
         const m = mult[goal] || mult.muscle;
         const kcal    = Math.round(weight * m.kcal);
@@ -275,11 +281,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
             <button
               onClick={() => onNavigate('nutrizione' as ScreenName)}
-              className={`w-full ${theme.card} border rounded-3xl overflow-hidden active:scale-[0.98] transition-transform`}
+              className={`w-full ${theme.card} border rounded-3xl overflow-hidden active:scale-[0.98] transition-transform text-left`}
             >
-              {/* Kcal hero row */}
               <div className="flex items-center justify-between p-4 pb-3">
-                <div className="text-left">
+                <div>
                   <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.label}`}>Fabbisogno Giornaliero</p>
                   <div className="flex items-baseline gap-1 mt-0.5">
                     <span className="text-3xl font-black" style={{ color: accentHex }}>{kcal}</span>
@@ -290,16 +295,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   <Flame size={22} style={{ color: accentHex }} />
                 </div>
               </div>
-              {/* Macros strip */}
-              <div className="flex border-t divide-x" style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+              <div className={`flex border-t divide-x ${isDarkMode ? 'border-white/5 divide-white/5' : 'border-black/5 divide-black/5'}`}>
                 {[
-                  { label: 'Proteine', value: protein, unit: 'g', color: '#10b981', Icon: Beef },
-                  { label: 'Carbo', value: carbs, unit: 'g', color: '#6366f1', Icon: Wheat },
-                  { label: 'Grassi', value: fat, unit: 'g', color: '#f59e0b', Icon: Zap },
-                ].map(({ label, value, unit, color, Icon }) => (
-                  <div key={label} className="flex-1 px-3 py-3 text-center" style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                  { label: 'Proteine', value: protein, color: '#10b981', Icon: Beef },
+                  { label: 'Carbo',    value: carbs,   color: '#6366f1', Icon: Wheat },
+                  { label: 'Grassi',   value: fat,     color: '#f59e0b', Icon: Zap },
+                ].map(({ label, value, color, Icon }) => (
+                  <div key={label} className="flex-1 px-3 py-3 text-center">
                     <Icon size={14} className="mx-auto mb-1" style={{ color }} />
-                    <p className="font-black text-sm" style={{ color: isDarkMode ? '#fff' : '#111' }}>{value}<span className={`text-[9px] font-medium ml-0.5 ${theme.label}`}>{unit}</span></p>
+                    <p className={`font-black text-sm ${theme.text}`}>{value}<span className={`text-[9px] font-medium ml-0.5 ${theme.label}`}>g</span></p>
                     <p className={`text-[9px] font-bold uppercase ${theme.label} mt-0.5`}>{label}</p>
                   </div>
                 ))}

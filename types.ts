@@ -128,6 +128,7 @@ export interface UserProfile {
   experience?: 'beginner' | 'intermediate' | 'advanced';
   equipment?: 'full_gym' | 'home_gym' | 'bodyweight';
 }
+}
 
 export interface Comment {
   id: string;

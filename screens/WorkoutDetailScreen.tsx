@@ -14,6 +14,7 @@ interface WorkoutDetailScreenProps {
   userProfile?: UserProfile;
   onShareToCommunity?: (post: Post) => void;
   onCreateWorkout?: () => void;
+  // BUG FIX: props mancanti che causavano crash quando referenziati nel render
   onEditWorkout?: (workout: WorkoutCard) => void;
   onDeleteCustomWorkout?: (workoutId: string) => void;
 }
@@ -330,8 +331,8 @@ const CATEGORY_INFO: Record<CategoryType, { color: string, icon: React.ElementTy
 };
 
 const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ 
-    onBack, customWorkouts, onWorkoutComplete, initialWorkoutId, isDarkMode, userProfile,
-    onCreateWorkout, onShareToCommunity, onEditWorkout, onDeleteCustomWorkout
+    onBack, customWorkouts, onWorkoutComplete, initialWorkoutId, isDarkMode, userProfile, onCreateWorkout, onShareToCommunity,
+    onEditWorkout, onDeleteCustomWorkout
 }) => {
   // MERGE: libreria default (20 schede) + schede custom dell'utente (non duplicare)
   const activeDatabase = useMemo(() => {
@@ -360,10 +361,6 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [completedSets, setCompletedSets] = useState<Set<string>>(new Set());
-  // Cedimento: "idx-setIdx" → true se l'utente ha raggiunto il cedimento su quella serie
-  const [failureSets, setFailureSets] = useState<Set<string>>(new Set());
-  // Drop set: "idx-setIdx" → true se l'utente ha eseguito un drop set
-  const [dropSets, setDropSets] = useState<Set<string>>(new Set());
 
   const [isResting, setIsResting] = useState(false);
   const [isRestPaused, setIsRestPaused] = useState(false); 
@@ -382,31 +379,42 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   };
 
   useEffect(() => {
-    if (initialWorkoutId && hasWorkouts) {
-        // Cerca in tutto: libreria default + custom + piano utente
-        const allSearchable = [...activeDatabase, ...(customWorkouts || [])];
-        let found: WorkoutCard | undefined = allSearchable.find(w => w.id === initialWorkoutId);
+    // BUG FIX #2: questo effect si deve eseguire SOLO quando initialWorkoutId cambia.
+    // Rimuovere customWorkouts e activeDatabase dalle dipendenze evita il re-fire
+    // ogni volta che si salva/modifica una scheda custom.
+    if (!initialWorkoutId) {
+        // Se initialWorkoutId è null (es. dopo un workout completato), assicuriamoci
+        // che lo stato sia pulito e non ci siano sessioni aperte per sbaglio
+        setActiveWorkout(null);
+        setIsSessionActive(false);
+        return;
+    }
+    if (!hasWorkouts) return;
 
-        // Handle scheduled workouts with prefixed IDs
-        if (!found && initialWorkoutId.startsWith('sched_')) {
-            const parts = initialWorkoutId.split('_');
-            if (parts.length > 2) {
-                const originalId = parts.slice(2).join('_');
-                found = allSearchable.find(w => w.id === originalId);
-            }
-        }
+    const allSearchable = [...activeDatabase, ...(customWorkouts || [])];
+    let found: WorkoutCard | undefined = allSearchable.find(w => w.id === initialWorkoutId);
 
-        if (found) {
-            setActiveWorkout(found);
-            setSelectedCategory(found.category);
-            
-            // If it's a scheduled workout, start the session immediately
-            if (initialWorkoutId.startsWith('sched_')) {
-                setIsSessionActive(true);
-            }
+    // Handle scheduled workouts with prefixed IDs (sched_DATE_originalId)
+    if (!found && initialWorkoutId.startsWith('sched_')) {
+        const parts = initialWorkoutId.split('_');
+        if (parts.length > 2) {
+            const originalId = parts.slice(2).join('_');
+            found = allSearchable.find(w => w.id === originalId);
         }
     }
-  }, [initialWorkoutId, activeDatabase, customWorkouts, hasWorkouts]);
+
+    if (found) {
+        setActiveWorkout(found);
+        setSelectedCategory(found.category);
+
+        // BUG FIX #2b: auto-start SOLO se è una scheda schedulata E non è già completata.
+        // Senza il check isCompleted, una scheda completata veniva riavviata in automatico.
+        if (initialWorkoutId.startsWith('sched_') && !found.isCompleted) {
+            setIsSessionActive(true);
+        }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialWorkoutId]); // dipende solo da initialWorkoutId — activeDatabase è stabile al mount
 
   const { displayWorkouts, customWorkoutsList } = useMemo(() => {
       const custom = activeDatabase.filter(w => w.isCustom || w.category === 'Custom');
@@ -460,6 +468,8 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
           return newSet;
       });
 
+      // BUG FIX #8: avvia il timer recupero SOLO quando si segna una serie come completata,
+      // NON quando si de-seleziona (isAlreadyCompleted = true = stiamo togliendo il check)
       if (!isAlreadyCompleted && activeWorkout) {
           const duration = (CATEGORY_INFO[activeWorkout.category as keyof typeof CATEGORY_INFO] ?? CATEGORY_INFO['Massa']).restSeconds;
           setTotalRestTime(duration); 
@@ -497,12 +507,15 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
           onWorkoutComplete(elapsedSeconds, 5, customImage, activeWorkout, nextScreen);
       }
       
+      // BUG FIX #7: resetta tutto lo stato della sessione per evitare "sessione fantasma"
+      // che si riapre alla prossima visita della schermata workout
       setShowRecap(false); 
       setActiveWorkout(null); 
-      setElapsedSeconds(0); 
+      setIsSessionActive(false);
+      setIsResting(false);
+      setElapsedSeconds(0);
       setCompletedSets(new Set());
-      setFailureSets(new Set());
-      setDropSets(new Set());
+      setRestTimeRemaining(0);
   };
 
   if (isSessionActive && activeWorkout) {
@@ -574,88 +587,28 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                       const setsCount = match ? Math.max(1, Math.min(6, parseInt(match[1]))) : 3;
                       const setsCompleted = Array.from({length: setsCount}).filter((_, si) => completedSets.has(`${idx}-${si}`)).length;
                       const isFullyDone = setsCompleted === setsCount;
-                      // Conta cedimenti su questo esercizio
-                      const failureCount = Array.from({length: setsCount}).filter((_, si) => failureSets.has(`${idx}-${si}`)).length;
                       return (
-                          <div key={idx} className={`rounded-[1.5rem] border transition-all duration-300 overflow-hidden ${isFullyDone ? 'bg-zinc-900/50 border-white/5 opacity-70' : 'bg-[#1c1c1e] border-white/10 shadow-lg'}`}>
-                              <div className="p-5 pb-4">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                      <h3 className={`text-xl font-bold ${isFullyDone ? 'text-zinc-500' : 'text-white'}`}>{ex.name}</h3>
-                                      <p className="text-zinc-500 text-xs font-medium uppercase mt-1 tracking-wide">{ex.reps}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      {failureCount > 0 && (
-                                        <span className="text-[10px] font-black bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
-                                          ⚡ {failureCount} cedim.
-                                        </span>
-                                      )}
-                                      {isFullyDone && <div className="bg-emerald-500/20 text-emerald-500 p-1.5 rounded-full"><CheckCircle2 size={16}/></div>}
-                                    </div>
-                                </div>
-                                {/* Set buttons */}
-                                <div className="flex gap-2">
-                                    {Array.from({length: setsCount}).map((_, setIdx) => {
-                                        const key = `${idx}-${setIdx}`;
-                                        const isDone = completedSets.has(key);
-                                        const isFailure = failureSets.has(key);
-                                        const isDrop = dropSets.has(key);
-                                        return (
-                                            <div key={setIdx} className="flex-1 flex flex-col gap-1.5">
-                                              <button
-                                                onClick={() => handleSetCompletion(idx, setIdx)}
-                                                className={`h-12 rounded-xl font-bold flex items-center justify-center transition-all duration-200 text-sm w-full ${
-                                                  isDone
-                                                    ? isFailure
-                                                      ? 'bg-amber-500 text-black shadow-[0_0_12px_rgba(245,158,11,0.4)]'
-                                                      : isDrop
-                                                      ? 'bg-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
-                                                      : 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
-                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
-                                                }`}>
-                                                {isDone
-                                                  ? isFailure ? '⚡' : isDrop ? 'DROP' : <CheckCircle2 size={18} />
-                                                  : <span className="text-xs">{setIdx + 1}</span>
-                                                }
-                                              </button>
-                                              {/* Bottoni cedimento/dropset — visibili solo se la serie è completata */}
-                                              {isDone && (
-                                                <div className="flex gap-1">
-                                                  <button
-                                                    onClick={() => setFailureSets(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
-                                                    className={`flex-1 h-6 rounded-lg text-[9px] font-black transition-all ${isFailure ? 'bg-amber-500/30 text-amber-400 border border-amber-500/40' : 'bg-zinc-800 text-zinc-600 hover:text-amber-400'}`}>
-                                                    ⚡
-                                                  </button>
-                                                  <button
-                                                    onClick={() => setDropSets(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
-                                                    className={`flex-1 h-6 rounded-lg text-[9px] font-black transition-all ${isDrop ? 'bg-purple-500/30 text-purple-400 border border-purple-500/40' : 'bg-zinc-800 text-zinc-600 hover:text-purple-400'}`}>
-                                                    ↓
-                                                  </button>
-                                                </div>
-                                              )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                          <div key={idx} className={`rounded-[1.5rem] p-5 border transition-all duration-300 ${isFullyDone ? 'bg-zinc-900/50 border-white/5 opacity-60' : 'bg-[#1c1c1e] border-white/10 shadow-lg'}`}>
+                              <div className="flex justify-between items-start mb-5">
+                                  <div>
+                                    <h3 className={`text-xl font-bold ${isFullyDone ? 'text-zinc-500' : 'text-white'}`}>{ex.name}</h3>
+                                    <p className="text-zinc-500 text-xs font-medium uppercase mt-1 tracking-wide">{ex.reps}</p>
+                                  </div>
+                                  {isFullyDone && <div className="bg-emerald-500/20 text-emerald-500 p-1.5 rounded-full"><CheckCircle2 size={16}/></div>}
                               </div>
-                              {/* Legenda inline */}
-                              {isFullyDone && (failureCount > 0 || Array.from({length: setsCount}).some((_, si) => dropSets.has(`${idx}-${si}`))) && (
-                                <div className="px-5 pb-3 flex gap-3">
-                                  {failureCount > 0 && <span className="text-[10px] text-amber-500/70">⚡ Cedimento = massimo sforzo raggiunto</span>}
-                                  {Array.from({length: setsCount}).some((_, si) => dropSets.has(`${idx}-${si}`)) && <span className="text-[10px] text-purple-500/70">↓ Drop set = peso ridotto, continuato</span>}
-                                </div>
-                              )}
+                              <div className="flex gap-2.5">
+                                  {Array.from({length: setsCount}).map((_, setIdx) => {
+                                      const isDone = completedSets.has(`${idx}-${setIdx}`);
+                                      return (
+                                          <button key={setIdx} onClick={() => handleSetCompletion(idx, setIdx)} className={`flex-1 h-12 rounded-lg font-bold flex items-center justify-center transition-all duration-200 text-sm ${isDone ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}>
+                                              {isDone ? <CheckCircle2 size={20} /> : `Set ${setIdx + 1}`}
+                                          </button>
+                                      )
+                                  })}
+                              </div>
                           </div>
                       );
                   })}
-                  {/* Legenda globale */}
-                  <div className="bg-zinc-900/50 rounded-xl p-3 border border-zinc-800">
-                    <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest mb-1.5">Tecniche Avanzate</p>
-                    <div className="flex gap-4">
-                      <span className="text-[11px] text-zinc-500">⚡ <span className="text-amber-400">Cedimento</span> — raggiungi il limite</span>
-                      <span className="text-[11px] text-zinc-500">↓ <span className="text-purple-400">Drop Set</span> — riduci e continua</span>
-                    </div>
-                  </div>
                   <div className="h-10"></div>
               </div>
           </div>
@@ -737,7 +690,12 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
             </div>
 
             <div className="px-6 mb-8">
-                <div className="w-full aspect-[4/3] rounded-[2rem] overflow-hidden relative shadow-2xl group cursor-pointer" onClick={() => { if(displayWorkouts[0]) setActiveWorkout(displayWorkouts[0]); }}>
+                <div className="w-full aspect-[4/3] rounded-[2rem] overflow-hidden relative shadow-2xl group cursor-pointer" onClick={() => {
+                    // BUG FIX #6: scegli il primo workout non-completato della categoria
+                    // altrimenti aprirebbe sempre l'ultimo completato (che era in cima)
+                    const first = displayWorkouts.find(w => !w.isCompleted) || displayWorkouts[0];
+                    if (first) setActiveWorkout(first);
+                }}>
                     <img src={currentHeroImage} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6">
                         <span className="text-emerald-400 font-bold text-xs uppercase tracking-widest mb-1">In Evidenza</span>
@@ -771,7 +729,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                       {customWorkoutsList.slice(0, 5).map((w) => (
                         <div key={w.id} className={`shrink-0 w-44 rounded-2xl border overflow-hidden ${isDarkMode ? 'bg-purple-500/5 border-purple-500/20' : 'bg-purple-50 border-purple-200'}`}>
-                          {/* Card body — apre la scheda */}
+                          {/* Card body apre la scheda */}
                           <div onClick={() => setActiveWorkout(w)} className="p-4 cursor-pointer active:scale-95 transition-transform">
                             <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mb-3">
                               <Sparkles size={18} className="text-purple-400" />
@@ -779,14 +737,12 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                             <h4 className={`font-bold text-sm ${theme.text} truncate`}>{w.title}</h4>
                             <p className={`text-[10px] ${theme.textSub} mt-1`}>{w.exercises.length} Esercizi</p>
                           </div>
-                          {/* Azioni edit/delete */}
+                          {/* Edit / Delete */}
                           {(onEditWorkout || onDeleteCustomWorkout) && (
                             <div className={`flex border-t ${isDarkMode ? 'border-purple-500/20' : 'border-purple-200'}`}>
                               {onEditWorkout && (
-                                <button
-                                  onClick={e => { e.stopPropagation(); onEditWorkout(w); }}
-                                  className={`flex-1 py-2 flex items-center justify-center gap-1 text-[10px] font-bold text-purple-400 hover:bg-purple-500/10 transition-colors`}
-                                >
+                                <button onClick={e => { e.stopPropagation(); onEditWorkout(w); }}
+                                  className="flex-1 py-2 flex items-center justify-center gap-1 text-[10px] font-bold text-purple-400 hover:bg-purple-500/10 transition-colors">
                                   <Edit3 size={11} /> Modifica
                                 </button>
                               )}
@@ -794,10 +750,8 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
                                 <div className={`w-px ${isDarkMode ? 'bg-purple-500/20' : 'bg-purple-200'}`} />
                               )}
                               {onDeleteCustomWorkout && (
-                                <button
-                                  onClick={e => { e.stopPropagation(); onDeleteCustomWorkout(w.id); }}
-                                  className="flex-1 py-2 flex items-center justify-center gap-1 text-[10px] font-bold text-red-400 hover:bg-red-500/10 transition-colors"
-                                >
+                                <button onClick={e => { e.stopPropagation(); onDeleteCustomWorkout(w.id); }}
+                                  className="flex-1 py-2 flex items-center justify-center gap-1 text-[10px] font-bold text-red-400 hover:bg-red-500/10 transition-colors">
                                   <Trash2 size={11} /> Elimina
                                 </button>
                               )}
@@ -878,38 +832,44 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
               <div className="absolute bottom-0 left-0 right-0 p-6">
                   <h1 className="text-4xl font-extrabold text-white mb-2 leading-none">{activeWorkout.title}</h1>
                   <p className="text-zinc-300 font-medium text-lg">{activeWorkout.focus}</p>
-                  <div className="flex gap-4 mt-4">
-                    {activeWorkout.isCompleted ? (
-                      // SESSIONE COMPLETATA — bloccata, non riavviabile
-                      <div className="flex-1 bg-zinc-800/80 border border-zinc-700 rounded-2xl py-4 flex flex-col items-center justify-center gap-1">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 size={18} className="text-emerald-400" />
-                          <span className="text-emerald-400 font-bold text-sm">Sessione Completata</span>
-                        </div>
-                        {activeWorkout.completedDuration && (
-                          <span className="text-zinc-500 text-xs font-mono">
-                            {Math.floor(activeWorkout.completedDuration / 60)} min • {new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}
-                          </span>
-                        )}
-                        <span className="text-zinc-600 text-[10px] mt-0.5 flex items-center gap-1">
-                          <Lock size={9} /> Non modificabile dopo il completamento
-                        </span>
-                      </div>
-                    ) : (
-                      // SESSIONE NON ANCORA FATTA — avviabile normalmente
-                      <button onClick={() => setIsSessionActive(true)} className="flex-1 bg-emerald-500 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-105 transition-transform">
-                        <Play fill="currentColor" size={20}/> INIZIA
-                      </button>
-                    )}
-                    {/* Pulsante modifica — solo per schede custom non completate */}
-                    {activeWorkout.isCustom && !activeWorkout.isCompleted && onEditWorkout && (
-                      <button
-                        onClick={() => onEditWorkout(activeWorkout)}
-                        className="w-14 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-2xl flex items-center justify-center hover:bg-zinc-700 transition-colors active:scale-95"
-                      >
-                        <Edit3 size={18} />
-                      </button>
-                    )}
+                  <div className="flex gap-3 mt-4">
+                      {activeWorkout.isCompleted ? (
+                          // SESSIONE GIÀ COMPLETATA — non riavviabile
+                          <div className="flex-1 bg-zinc-800/80 border border-zinc-700 rounded-2xl py-4 flex flex-col items-center justify-center gap-1">
+                              <div className="flex items-center gap-2">
+                                  <CheckCircle2 size={18} className="text-emerald-400" />
+                                  <span className="text-emerald-400 font-bold text-sm">Sessione Completata</span>
+                              </div>
+                              {activeWorkout.completedDuration && (
+                                  <span className="text-zinc-500 text-xs font-mono">
+                                      {Math.floor(activeWorkout.completedDuration / 60)} min
+                                  </span>
+                              )}
+                              <span className="text-zinc-600 text-[10px] mt-0.5">Non modificabile dopo il completamento</span>
+                          </div>
+                      ) : (
+                          // SESSIONE DISPONIBILE
+                          <button onClick={() => setIsSessionActive(true)} className="flex-1 bg-emerald-500 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-105 transition-transform">
+                              <Play fill="currentColor" size={20}/> INIZIA
+                          </button>
+                      )}
+                      {/* Pulsanti edit/delete — solo per schede custom non completate */}
+                      {activeWorkout.isCustom && !activeWorkout.isCompleted && onEditWorkout && (
+                          <button
+                              onClick={() => onEditWorkout(activeWorkout)}
+                              className="w-14 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-2xl flex items-center justify-center hover:bg-zinc-700 transition-colors active:scale-95"
+                          >
+                              <Edit3 size={18} />
+                          </button>
+                      )}
+                      {activeWorkout.isCustom && !activeWorkout.isCompleted && onDeleteCustomWorkout && (
+                          <button
+                              onClick={() => onDeleteCustomWorkout(activeWorkout.id)}
+                              className="w-14 bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl flex items-center justify-center hover:bg-red-500/20 transition-colors active:scale-95"
+                          >
+                              <Trash2 size={18} />
+                          </button>
+                      )}
                   </div>
               </div>
           </div>

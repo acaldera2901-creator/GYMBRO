@@ -8,6 +8,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
 });
 
+// --- HELPER: Sessione valida con auto-refresh ---
 const getValidSession = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
@@ -20,6 +21,7 @@ const getValidSession = async () => {
     return session;
 };
 
+// --- GUEST LOCAL STORAGE ---
 const GUEST_STORAGE_KEY = 'gymbro_guest_data';
 const getGuestData = () => { try { const d = localStorage.getItem(GUEST_STORAGE_KEY); return d ? JSON.parse(d) : null; } catch { return null; } };
 const saveGuestData = (data: any) => {
@@ -31,34 +33,28 @@ const saveGuestData = (data: any) => {
     } catch (e) { console.error('LS Save Error', e); }
 };
 
-// --- 1. FETCH USER DATA (ora include custom_workouts) ---
+// --- 1. FETCH DATI UTENTE ---
 export const fetchUserData = async (userId: string) => {
     if (userId.startsWith('guest_')) {
         const localData = getGuestData();
-        if (localData?.profile) return { profile: localData.profile, history: localData.history || [], customWorkouts: localData.customWorkouts || [], schedules: [] };
+        if (localData?.profile) return { profile: localData.profile, history: localData.history || [], schedules: [] };
         return null;
     }
     try {
-        const [profileRes, historyRes, customRes] = await Promise.all([
+        const [profileRes, historyRes] = await Promise.all([
             supabase.from('profiles').select('*').eq('id', userId).single(),
-            supabase.from('workout_history').select('*').eq('user_id', userId).order('date', { ascending: false }),
-            supabase.from('custom_workouts').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+            supabase.from('workout_history').select('*').eq('user_id', userId).order('date', { ascending: false })
         ]);
         if (profileRes.error) { if (profileRes.error.code === 'PGRST116') return null; throw new Error(profileRes.error.message); }
         if (historyRes.error) throw new Error(historyRes.error.message);
-        const customWorkouts = (customRes.data || []).map((cw: any) => ({
-            id: cw.id, category: cw.category, title: cw.title,
-            focus: cw.focus || '', exercises: cw.exercises || [],
-            isCustom: true, affinityScore: 100
-        }));
-        return { profile: profileRes.data, history: historyRes.data || [], customWorkouts, schedules: [] };
+        return { profile: profileRes.data, history: historyRes.data || [], schedules: [] };
     } catch (e: any) { console.error('[Supabase] Fetch Error:', e.message); throw e; }
 };
 
-// --- 2. GUEST UPDATE ---
+// --- 2. GUEST PROFILE UPDATE ---
 export const updateGuestProfile = async (profileData: any) => { saveGuestData({ profile: profileData }); };
 
-// --- 3. SAVE FULL PROFILE (setup) ---
+// --- 3. SALVATAGGIO COMPLETO PROFILO (fine setup) ---
 export const saveFullProfile = async (userId: string, profile: any) => {
     if (userId.startsWith('guest_')) {
         saveGuestData({ profile: { ...profile, setup_completed: true, training_days: profile.trainingDays, favorite_exercises: profile.favoriteExercises, current_plan: profile.currentPlan, test_exercise: profile.testExercise, test_weight: profile.testWeight, test_reps: profile.testReps } });
@@ -70,12 +66,13 @@ export const saveFullProfile = async (userId: string, profile: any) => {
         name: profile.name, gender: profile.gender, weight: profile.weight, height: profile.height,
         goal: profile.goal, test_exercise: profile.testExercise, test_weight: profile.testWeight, test_reps: profile.testReps,
         image: profile.image, training_days: profile.trainingDays, favorite_exercises: profile.favoriteExercises,
-        current_plan: profile.currentPlan, maxes: profile.maxes, setup_completed: true, updated_at: new Date().toISOString()
+        current_plan: profile.currentPlan, maxes: profile.maxes,
+        setup_completed: true, updated_at: new Date().toISOString()
     }).eq('id', userId);
     if (error) throw new Error(`Profile save failed: ${error.message}`);
 };
 
-// --- 4. UPDATE PARTIAL PROFILE ---
+// --- 4. AGGIORNAMENTO PARZIALE PROFILO ---
 export const updateProfileField = async (userId: string, fields: Record<string, any>) => {
     if (userId.startsWith('guest_')) { saveGuestData({ profile: fields }); return; }
     const session = await getValidSession();
@@ -83,82 +80,33 @@ export const updateProfileField = async (userId: string, fields: Record<string, 
     await supabase.from('profiles').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', userId);
 };
 
-// --- 5. SAVE CURRENT PLAN (ogni volta che cambia il piano) ---
-export const saveCurrentPlan = async (userId: string, currentPlan: WorkoutCard[]) => {
-    if (userId.startsWith('guest_')) {
-        saveGuestData({ profile: { current_plan: currentPlan } });
-        return;
-    }
-    const session = await getValidSession();
-    if (!session) return;
-    // Solo le schede non-custom nel current_plan del profilo
-    const planToSave = currentPlan.filter(w => !w.isCustom);
-    const { error } = await supabase.from('profiles')
-        .update({ current_plan: planToSave, updated_at: new Date().toISOString() })
-        .eq('id', userId);
-    if (error) console.error('[Supabase] saveCurrentPlan error:', error.message);
-};
-
-// --- 6. SAVE TRAINING DAYS ---
-export const saveTrainingDays = async (userId: string, trainingDays: number[]) => {
-    if (userId.startsWith('guest_')) { saveGuestData({ profile: { training_days: trainingDays } }); return; }
-    const session = await getValidSession();
-    if (!session) return;
-    await supabase.from('profiles').update({ training_days: trainingDays, updated_at: new Date().toISOString() }).eq('id', userId);
-};
-
-// --- 7. CUSTOM WORKOUT: SAVE (crea o aggiorna) ---
-export const saveCustomWorkout = async (userId: string, workout: WorkoutCard): Promise<WorkoutCard> => {
-    if (userId.startsWith('guest_')) {
-        const current = getGuestData() || {};
-        const existing = current.customWorkouts || [];
-        saveGuestData({ customWorkouts: [workout, ...existing.filter((w: WorkoutCard) => w.id !== workout.id)] });
-        return workout;
-    }
-    const session = await getValidSession();
-    if (!session) throw new Error('Sessione scaduta.');
-    const { error } = await supabase.from('custom_workouts').upsert({
-        id: workout.id, user_id: userId, title: workout.title,
-        category: workout.category, focus: workout.focus || '',
-        exercises: workout.exercises, is_custom: true, updated_at: new Date().toISOString()
-    }, { onConflict: 'id' });
-    if (error) throw new Error(`Custom workout save failed: ${error.message}`);
-    return workout;
-};
-
-// --- 8. CUSTOM WORKOUT: DELETE ---
-export const deleteCustomWorkout = async (userId: string, workoutId: string): Promise<void> => {
-    if (userId.startsWith('guest_')) {
-        const current = getGuestData() || {};
-        saveGuestData({ customWorkouts: (current.customWorkouts || []).filter((w: WorkoutCard) => w.id !== workoutId) });
-        return;
-    }
-    const session = await getValidSession();
-    if (!session) return;
-    await supabase.from('custom_workouts').delete().eq('id', workoutId).eq('user_id', userId);
-};
-
-// --- 9. COMPLETE WORKOUT ---
+// --- 5. COMPLETAMENTO WORKOUT ---
 export const completeWorkoutTransaction = async (userId: string, workout: WorkoutCard, duration: number, newBadges: Badge[]) => {
     const today = new Date().toISOString().split('T')[0];
     const historyData = { ...workout, isCompleted: true, completedDuration: duration, completedAt: new Date().toISOString() };
+
     if (userId.startsWith('guest_')) {
         const current = getGuestData() || {};
         const newItem = { id: `hist_${Date.now()}`, user_id: userId, date: today, workout_data: historyData, duration };
         saveGuestData({ history: [newItem, ...(current.history || [])], profile: { ...(current.profile || {}), badges: newBadges } });
         return newItem;
     }
+
     const session = await getValidSession();
     if (!session) throw new Error('Sessione scaduta. Effettua di nuovo il login per salvare i progressi.');
+
     const { data: historyEntry, error: historyError } = await supabase
         .from('workout_history').insert({ user_id: userId, date: today, workout_data: historyData, duration }).select().single();
     if (historyError) throw new Error(`Save failed: ${historyError.message}`);
+
+    // Badge update non-bloccante
     supabase.from('profiles').update({ badges: newBadges, updated_at: new Date().toISOString() }).eq('id', userId)
         .then(({ error }) => { if (error) console.warn('Badge update failed:', error.message); });
+
     return historyEntry;
 };
 
-// --- 10. REVERT WORKOUT ---
+// --- 6. ANNULLAMENTO WORKOUT ---
 export const revertWorkoutTransaction = async (userId: string, historyId: string) => {
     if (userId.startsWith('guest_')) {
         const current = getGuestData() || {};
@@ -168,30 +116,20 @@ export const revertWorkoutTransaction = async (userId: string, historyId: string
     }
     const session = await getValidSession();
     if (!session) throw new Error('Sessione scaduta.');
-    const cleanId = historyId.replace(/^(db_|done_)/, '');
-    const { error } = await supabase.from('workout_history').delete().eq('id', cleanId);
+    const { error } = await supabase.from('workout_history').delete().eq('id', historyId.replace('db_', ''));
     if (error) throw new Error(`Delete failed: ${error.message}`);
     return true;
 };
 
-// --- 11. UPDATE STATS ---
+// --- 7. UPDATE STATS ---
 export const updateUserStats = async (userId: string, stats: Partial<UserStats>) => {
-    if (userId.startsWith('guest_')) {
-        saveGuestData({ profile: { weight: stats.weight, height: stats.height, challenges_won: stats.challengesWon, kg_lifted: stats.kgLifted, maxes: stats.maxes } });
-        return;
-    }
+    if (userId.startsWith('guest_')) { saveGuestData({ profile: { weight: stats.weight, height: stats.height, challenges_won: stats.challengesWon, kg_lifted: stats.kgLifted, maxes: stats.maxes } }); return; }
     const session = await getValidSession();
     if (!session) return;
-    const payload: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (stats.weight !== undefined) payload.weight = stats.weight;
-    if (stats.height !== undefined) payload.height = stats.height;
-    if (stats.challengesWon !== undefined) payload.challenges_won = stats.challengesWon;
-    if (stats.kgLifted !== undefined) payload.kg_lifted = stats.kgLifted;
-    if (stats.maxes !== undefined) payload.maxes = stats.maxes;
-    await supabase.from('profiles').update(payload).eq('id', userId);
+    await supabase.from('profiles').update({ weight: stats.weight, height: stats.height, challenges_won: stats.challengesWon, kg_lifted: stats.kgLifted, maxes: stats.maxes, updated_at: new Date().toISOString() }).eq('id', userId);
 };
 
-// --- 12. COMMUNITY: FETCH POSTS ---
+// --- 8. COMMUNITY: FETCH POSTS ---
 export const fetchCommunityPosts = async (): Promise<Post[]> => {
     try {
         const { data, error } = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
@@ -205,7 +143,7 @@ export const fetchCommunityPosts = async (): Promise<Post[]> => {
     } catch (e: any) { console.error('[Community] Fetch failed:', e.message); return []; }
 };
 
-// --- 13. COMMUNITY: CREATE POST ---
+// --- 9. COMMUNITY: CREA POST ---
 export const createPost = async (userId: string, postData: { user: string; userImage?: string; content: string; image?: string | null; tag?: string }): Promise<Post | null> => {
     if (userId.startsWith('guest_')) {
         return { id: `local_${Date.now()}`, userId, user: postData.user, userImage: postData.userImage, time: 'Adesso', content: postData.content, image: postData.image || undefined, tag: postData.tag, likes: 0, comments: 0, commentsList: [], liked: false };
@@ -217,13 +155,14 @@ export const createPost = async (userId: string, postData: { user: string; userI
     return { id: data.id, userId: data.user_id, user: data.user_name, userImage: data.user_image, time: 'Adesso', content: data.content, image: data.image, tag: data.tag, likes: 0, comments: 0, commentsList: [], liked: false };
 };
 
-// --- 14. COMMUNITY: LIKE ---
+// --- 10. COMMUNITY: LIKE ---
 export const toggleLikePost = async (postId: string, currentLikes: number, liked: boolean): Promise<number> => {
     const newLikes = liked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
     supabase.from('posts').update({ likes: newLikes }).eq('id', postId).then(() => {});
     return newLikes;
 };
 
+// --- HELPER: Tempo relativo ---
 const formatRelativeTime = (isoString: string): string => {
     const diff = Date.now() - new Date(isoString).getTime();
     const mins = Math.floor(diff / 60000);
@@ -234,6 +173,100 @@ const formatRelativeTime = (isoString: string): string => {
     return `${Math.floor(hours / 24)}g fa`;
 };
 
+// --- Legacy aliases ---
 export const addWorkoutToHistory = async () => { console.warn('Use completeWorkoutTransaction instead'); };
 export const removeWorkoutFromHistory = async () => { console.warn('Use revertWorkoutTransaction instead'); };
 export const undoWorkoutCompletion = async () => { console.warn('Use revertWorkoutTransaction instead'); };
+
+// --- 11. SALVA PIANO CORRENTE ---
+export const saveCurrentPlan = async (userId: string, plan: WorkoutCard[]) => {
+    if (userId.startsWith('guest_')) {
+        saveGuestData({ profile: { current_plan: plan } });
+        return;
+    }
+    const session = await getValidSession();
+    if (!session) return;
+    await supabase.from('profiles')
+        .update({ current_plan: plan, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+};
+
+// --- 12. SALVA SCHEDA CUSTOM ---
+export const saveCustomWorkout = async (userId: string, workout: WorkoutCard) => {
+    if (userId.startsWith('guest_')) {
+        const d = getGuestData() || {};
+        const customs: WorkoutCard[] = d.customWorkouts || [];
+        const idx = customs.findIndex((w: WorkoutCard) => w.id === workout.id);
+        const updated = idx >= 0
+            ? customs.map((w: WorkoutCard) => w.id === workout.id ? workout : w)
+            : [workout, ...customs];
+        saveGuestData({ customWorkouts: updated });
+        return;
+    }
+    const session = await getValidSession();
+    if (!session) return;
+    await supabase.from('custom_workouts').upsert({
+        id: workout.id,
+        user_id: userId,
+        title: workout.title,
+        category: workout.category,
+        focus: workout.focus,
+        exercises: workout.exercises,
+        is_custom: true,
+        updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+};
+
+// --- 13. ELIMINA SCHEDA CUSTOM ---
+export const deleteCustomWorkout = async (userId: string, workoutId: string) => {
+    if (userId.startsWith('guest_')) {
+        const d = getGuestData() || {};
+        const customs: WorkoutCard[] = d.customWorkouts || [];
+        saveGuestData({ customWorkouts: customs.filter((w: WorkoutCard) => w.id !== workoutId) });
+        return;
+    }
+    const session = await getValidSession();
+    if (!session) return;
+    await supabase.from('custom_workouts')
+        .delete()
+        .eq('id', workoutId)
+        .eq('user_id', userId);
+};
+
+// --- 14. SALVA GIORNI DI ALLENAMENTO ---
+export const saveTrainingDays = async (userId: string, days: number[]) => {
+    if (userId.startsWith('guest_')) {
+        saveGuestData({ profile: { training_days: days } });
+        return;
+    }
+    const session = await getValidSession();
+    if (!session) return;
+    await supabase.from('profiles')
+        .update({ training_days: days, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+};
+
+// --- fetchUserData con customWorkouts ---
+export const fetchCustomWorkouts = async (userId: string): Promise<WorkoutCard[]> => {
+    if (userId.startsWith('guest_')) {
+        const d = getGuestData();
+        return d?.customWorkouts || [];
+    }
+    try {
+        const { data, error } = await supabase
+            .from('custom_workouts')
+            .select('*')
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false });
+        if (error) { console.warn('custom_workouts fetch failed:', error.message); return []; }
+        return (data || []).map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            category: r.category,
+            focus: r.focus,
+            exercises: r.exercises || [],
+            isCustom: true,
+            affinityScore: 0
+        }));
+    } catch { return []; }
+};
