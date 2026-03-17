@@ -205,7 +205,8 @@ export const saveCustomWorkout = async (userId: string, workout: WorkoutCard) =>
     }
     const session = await getValidSession();
     if (!session) return;
-    await supabase.from('custom_workouts').upsert({
+
+    const payload = {
         id: workout.id,
         user_id: userId,
         title: workout.title,
@@ -214,7 +215,25 @@ export const saveCustomWorkout = async (userId: string, workout: WorkoutCard) =>
         exercises: workout.exercises,
         is_custom: true,
         updated_at: new Date().toISOString()
-    }, { onConflict: 'id' });
+    };
+
+    // Tenta INSERT prima; se esiste già (409 / 23505) fa UPDATE.
+    // Evita upsert con onConflict che triggera "failed to create snapshot"
+    // su tabelle con Realtime attiva ma replica non configurata.
+    const { error: insertError } = await supabase.from('custom_workouts').insert(payload);
+    if (insertError) {
+        if (insertError.code === '23505' || insertError.message?.toLowerCase().includes('duplicate')) {
+            // Record già esistente → aggiorna
+            const { error: updateError } = await supabase
+                .from('custom_workouts')
+                .update({ ...payload })
+                .eq('id', workout.id)
+                .eq('user_id', userId);
+            if (updateError) throw new Error(updateError.message);
+        } else {
+            throw new Error(insertError.message);
+        }
+    }
 };
 
 // --- 13. ELIMINA SCHEDA CUSTOM ---
