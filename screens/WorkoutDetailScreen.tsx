@@ -383,12 +383,7 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
   };
 
   useEffect(() => {
-    // BUG FIX #2: questo effect si deve eseguire SOLO quando initialWorkoutId cambia.
-    // Rimuovere customWorkouts e activeDatabase dalle dipendenze evita il re-fire
-    // ogni volta che si salva/modifica una scheda custom.
     if (!initialWorkoutId) {
-        // Se initialWorkoutId è null (es. dopo un workout completato), assicuriamoci
-        // che lo stato sia pulito e non ci siano sessioni aperte per sbaglio
         setActiveWorkout(null);
         setIsSessionActive(false);
         return;
@@ -398,7 +393,6 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
     const allSearchable = [...activeDatabase, ...(customWorkouts || [])];
     let found: WorkoutCard | undefined = allSearchable.find(w => w.id === initialWorkoutId);
 
-    // Handle scheduled workouts with prefixed IDs (sched_DATE_originalId)
     if (!found && initialWorkoutId.startsWith('sched_')) {
         const parts = initialWorkoutId.split('_');
         if (parts.length > 2) {
@@ -410,15 +404,16 @@ const WorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({
     if (found) {
         setActiveWorkout(found);
         setSelectedCategory(found.category);
-
-        // BUG FIX #2b: auto-start SOLO se è una scheda schedulata E non è già completata.
-        // Senza il check isCompleted, una scheda completata veniva riavviata in automatico.
+        // Auto-start SOLO per schede schedulate non completate (calendario → sessione immediata)
+        // Mai auto-start per custom_ o gen_ — sono aperture da libreria
         if (initialWorkoutId.startsWith('sched_') && !found.isCompleted) {
             setIsSessionActive(true);
         }
     }
+  // customWorkouts come dipendenza: serve per trovare il workout appena creato
+  // (race condition tra setGeneratedWorkouts e setCurrentScreen('workout'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialWorkoutId]); // dipende solo da initialWorkoutId — activeDatabase è stabile al mount
+  }, [initialWorkoutId, customWorkouts]);
 
   const { displayWorkouts, customWorkoutsList } = useMemo(() => {
       const custom = activeDatabase.filter(w => w.isCustom || w.category === 'Custom');

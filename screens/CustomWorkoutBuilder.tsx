@@ -126,26 +126,26 @@ const CustomWorkoutBuilder: React.FC<CustomWorkoutBuilderProps> = ({
     else if (step === 'exercises') setStep('review');
   };
 
-  // In CustomWorkoutBuilder.tsx - handleSave
-const handleSave = async () => {
-  const workout: WorkoutCard = {
-    id: initialWorkout?.id || `custom_${Date.now()}`,
-    category,
-    title: title.trim(),
-    focus: focus.trim() || 'Scheda personalizzata',
-    exercises: exercises
-      .filter(e => e.name.trim())
-      .map(e => ({
-        name: e.name.trim(),
-        reps: `${e.sets} x ${e.reps} (Rec. ${e.rest}")`,
-      })),
-    isCustom: true,
-    affinityScore: 100,
+  const handleSave = () => {
+    const workout: WorkoutCard = {
+      id: initialWorkout?.id || `custom_${Date.now()}`,
+      category,
+      title: title.trim(),
+      focus: focus.trim() || 'Scheda personalizzata',
+      exercises: exercises
+        .filter(e => e.name.trim())
+        .map(e => ({
+          name: e.name.trim(),
+          reps: `${e.sets} x ${e.reps} (Rec. ${e.rest}")`,
+        })),
+      isCustom: true,
+      affinityScore: 100,
+    };
+    setSaved(true);
+    // Fire-and-forget: NON await, altrimenti in React 19 lo smontaggio del componente
+    // (causato da setCurrentScreen dentro onSave) interrompe l'esecuzione asincrona
+    onSave(workout);
   };
-  setSaved(true);
-  // Niente setTimeout - chiama onSave direttamente
-  await onSave(workout);
-};
 
   const selectedCat = CATEGORY_OPTIONS.find(c => c.value === category) || CATEGORY_OPTIONS[4];
 

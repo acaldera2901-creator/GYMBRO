@@ -680,12 +680,35 @@ const App: React.FC = () => {
       />;
       case 'custom-workout-builder': return <CustomWorkoutBuilder
           onBack={() => { setEditingWorkout(null); setCurrentScreen('workout'); }}
-          onSave={async (workout) => {
-            await handleSaveCustomWorkout(workout);
+          onSave={(workout) => {
+            // Aggiorna lo stato locale SUBITO (navigazione reattiva)
+            setGeneratedWorkouts(prev => {
+              const idx = prev.findIndex(w => w.id === workout.id);
+              if (idx >= 0) { const u = [...prev]; u[idx] = workout; return u; }
+              return [workout, ...prev];
+            });
+            setUserProfile(p => {
+              const plan = p.currentPlan || [];
+              const idx = plan.findIndex(w => w.id === workout.id);
+              const updated = idx >= 0
+                ? plan.map(w => w.id === workout.id ? workout : w)
+                : [workout, ...plan];
+              return { ...p, currentPlan: updated };
+            });
+            // Naviga subito — lo smontaggio avviene qui
             setEditingWorkout(null);
-            // Apri la scheda appena salvata in sola-lettura (non in sessione)
             setSelectedWorkoutId(workout.id);
             setCurrentScreen('workout');
+            // Persisti sul DB in background (fire-and-forget, non bloccante)
+            if (sessionUserId) {
+              saveCustomWorkout(sessionUserId, workout).catch(console.error);
+              // Leggi il piano aggiornato dallo stato per salvarlo
+              setUserProfile(p => {
+                const updated = p.currentPlan || [];
+                saveCurrentPlan(sessionUserId, updated).catch(console.error);
+                return p; // non modificare lo stato, solo leggere
+              });
+            }
           }}
           initialWorkout={editingWorkout?.workout || null}
           isDarkMode={isDarkMode}
